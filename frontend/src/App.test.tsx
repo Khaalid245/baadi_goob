@@ -5,6 +5,6 @@ import App from './App';
 describe('App', () => {
   it('renders the layout navbar', () => {
     render(<App />);
-    expect(screen.getByText('Furan')).toBeInTheDocument();
+    expect(screen.getByText('Furan')).toBeTruthy();
   });
 });

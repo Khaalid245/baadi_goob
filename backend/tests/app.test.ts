@@ -1,5 +1,6 @@
 import request from 'supertest';
-import app from '../src/app';
+import appModule from '../src/app';
+const app = (appModule as any).default || appModule;
 
 describe('App Endpoints', () => {
   it('GET /api/v1/health should return { status: "ok" }', async () => {
