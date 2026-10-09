@@ -1,0 +1,128 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  STUDENT
+  BUSINESS
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum OpportunityType {
+  INTERNSHIP
+  JOB
+  COMPETITION
+}
+
+enum OpportunityStatus {
+  OPEN
+  CLOSED
+}
+
+enum ApplicationStatus {
+  NEW
+  SHORTLISTED
+  REJECTED
+  HIRED
+}
+
+model User {
+  id            String    @id @default(uuid())
+  role          Role
+  name          String
+  email         String    @unique
+  password_hash String
+  status        UserStatus @default(ACTIVE)
+  created_at    DateTime  @default(now())
+
+  studentProfile  StudentProfile?
+  businessProfile BusinessProfile?
+  opportunities   Opportunity[]
+  applications    Application[]
+  registrations   CompetitionRegistration[]
+  notifications   Notification[]
+}
+
+model StudentProfile {
+  id            String @id @default(uuid())
+  user_id       String @unique
+  user          User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  education     String?
+  skills        Json?
+  project_links Json?
+}
+
+model BusinessProfile {
+  id                 String             @id @default(uuid())
+  user_id            String             @unique
+  user               User               @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  company_name       String
+  verification_status VerificationStatus @default(PENDING)
+}
+
+model Opportunity {
+  id              String            @id @default(uuid())
+  posted_by       String
+  user            User              @relation(fields: [posted_by], references: [id], onDelete: Cascade)
+  type            OpportunityType
+  title           String
+  description     String            @db.Text
+  skills_required Json?
+  deadline        DateTime
+  status          OpportunityStatus @default(OPEN)
+
+  applications    Application[]
+  registrations   CompetitionRegistration[]
+
+  @@index([type, status, deadline])
+  @@fulltext([title, description])
+}
+
+model Application {
+  id             String            @id @default(uuid())
+  student_id     String
+  opportunity_id String
+  user           User              @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  opportunity    Opportunity       @relation(fields: [opportunity_id], references: [id], onDelete: Cascade)
+  status         ApplicationStatus @default(NEW)
+  submitted_at   DateTime          @default(now())
+
+  @@unique([student_id, opportunity_id])
+}
+
+model CompetitionRegistration {
+  id             String      @id @default(uuid())
+  student_id     String
+  opportunity_id String
+  user           User        @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  opportunity    Opportunity @relation(fields: [opportunity_id], references: [id], onDelete: Cascade)
+  registered_at  DateTime    @default(now())
+
+  @@unique([student_id, opportunity_id])
+}
+
+model Notification {
+  id         String   @id @default(uuid())
+  user_id    String
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  type       String
+  message    String
+  channel    String
+  sent_at    DateTime @default(now())
+}
