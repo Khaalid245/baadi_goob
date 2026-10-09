@@ -19,14 +19,14 @@
   "author": "",
   "license": "UNLICENSED",
   "dependencies": {
-    "@prisma/client": "^7.10.0",
+    "@prisma/client": "^5.22.0",
     "cors": "^2.8.6",
     "dotenv": "^18.0.5",
     "express": "^5.2.1",
     "helmet": "^8.3.0",
     "pino": "^10.4.0",
     "pino-http": "^11.0.0",
-    "prisma": "^8.0.0-rc.22",
+    "prisma": "^5.22.0",
     "swagger-ui-express": "^5.0.1",
     "yamljs": "^0.3.0",
     "zod": "^4.6.5"
