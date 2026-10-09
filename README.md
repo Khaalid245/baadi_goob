@@ -36,15 +36,15 @@ A two-sided platform connecting Somali students with internships, jobs, and comp
    Run the following exact commands from the `/backend` folder:
    ```bash
    cd backend
-   npx prisma generate
-   npx prisma migrate dev --name init
+   npm run prisma:generate
+   npm run prisma:migrate --name init
    npm run prisma:seed
    ```
-   *(Note: For the seed, it will use the `ADMIN_PASSWORD` from `.env` to create the admin user `admin@furan.local`. If you encounter a global Prisma agent skills bug, the `npx prisma` commands will use your local project's Prisma binary).*
+   *(Note: For the seed, it will use the `ADMIN_PASSWORD` from `.env` to create the admin user `admin@furan.local`. By using `npm run`, we strictly use the local project's Prisma binary, bypassing any global bugs).*
    
    To deploy migrations in production (or inside Docker):
    ```bash
-   npx prisma migrate deploy
+   npm run prisma:deploy
    ```
 
 5. **Run Tests**:
