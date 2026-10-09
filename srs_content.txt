@@ -1,0 +1,894 @@
+Software Requirements Specification
+A two-sided platform connecting Somali students with internships, jobs, and competitions
+Project: Furan (MVP)
+Prepared by: Hanad Ismail (Project Coordinator) & Team
+Version: 1.2 (updated from v1.1) | October 2026
+How to use this document
+Part A (Sections 1–15) is the SRS. It says WHAT the system must do. Everyone reads it.
+Part B (Development Guide) is for the backend and frontend teams. It lists the pages, dashboards, tech stack, production DevOps, API list, and a start-up plan. It is guidance, except the technology choices in Section 2.8, which are fixed for the MVP.
+What changed in v1.1 and v1.2
+The main idea, scope, roles, and FR-001 to FR-015 are unchanged.
+Added FR-016 to FR-023 to fill gaps (login, password reset, competition registrants, verification notice, delete account, user management, dashboards, keyword search).
+Added IDs to the non-functional requirements and two new use cases (8.3, 8.4).
+Added Sections 2.7 and 2.8, a fuller traceability table, and Part B.
+v1.2: The tech stack is now fixed: Node.js + TypeScript backend, MySQL database, React + TypeScript frontend, and a production DevOps setup (Section 2.8 and Part B, Section B3).
+v1.2: Django and PostgreSQL were replaced by Node.js and MySQL everywhere. Added NFR-12 (deployment) and NFR-13 (monitoring).
+
+PART A: REQUIREMENTS
+1. INTRODUCTION & SCOPE
+1.1 Purpose
+Furan is a two-sided web platform connecting Somali college students and young talent with internships, jobs, and skill competitions, while giving businesses, startups, and government institutions an efficient way to discover and hire qualified entry-level talent. This document specifies the requirements for the Furan MVP.
+1.2 Problem
+Roughly 500,000 young Somalis enter the labour market every year, but only about 80,000 jobs are created annually (World Bank). Students lack a dedicated platform to showcase skills or find internships, and employers struggle to find qualified young talent. Existing platforms (SomaliJobs, Shaqo, FursadLink) are general job boards skewed toward NGO/international listings, not built around student profiles or employer-hosted competitions.
+1.3 Scope
+Included in MVP:
+Student registration and skills/project profile
+Businesses posting internships, jobs, and competitions
+Students browsing and applying to opportunities
+Businesses reviewing and shortlisting applicants
+Basic competition/hackathon listing and registration
+Excluded from MVP (future phases):
+Payment processing (paid competitions, premium listings)
+AI-based skill matching and recommendations
+Native mobile applications (web-first for MVP)
+In-app messaging between students and employers
+1.4 Intended Users & Stakeholders
+Students — primary users seeking opportunities
+Businesses, organizations, and government bodies — posting and hiring
+Founding/development team — building and maintaining the platform
+Future investors or partners — secondary stakeholders
+1.5 Definitions & Abbreviations
+Term
+Meaning
+MVP
+Minimum Viable Product
+SRS
+Software Requirements Specification
+Opportunity
+An internship, job, or competition listed on the platform
+Applicant
+A student who has applied to an opportunity
+FR / NFR
+Functional Requirement / Non-Functional Requirement
+Verified business
+A business account that an administrator has approved
+JWT
+JSON Web Token, used to keep a user logged in
+API
+The connection that lets the frontend ask the backend for data
+2. OVERALL SYSTEM DESCRIPTION
+2.1 User Roles
+Role
+What they do
+Student
+Creates a profile, browses/searches opportunities, applies, tracks application status, joins competitions
+Business / Organization
+Creates a company profile, posts opportunities, reviews applicants, shortlists and hires
+Administrator
+Verifies businesses, moderates listings, manages platform content and user accounts
+2.2 Main System Functions
+User registration and authentication (student/business roles)
+Profile creation and management
+Opportunity posting, browsing, filtering, and search
+Application submission and status tracking
+Applicant review and shortlisting
+Competition listing and registration
+2.3 Operating Environment
+Web-based application, accessible via modern browsers (Chrome, Safari, Firefox) on both desktop and mobile web. No native mobile app in the MVP; the interface is designed responsively for mobile-web use given variable connectivity in parts of Somalia.
+2.4 Assumptions
+Users have internet access and a smartphone or computer
+Businesses are willing to verify their identity to post listings
+Initial user base is concentrated in Mogadishu, expanding over time
+2.5 Dependencies
+Hosting/cloud infrastructure: a Linux server or cloud provider that runs Docker (provider to be selected by the team)
+MySQL database for storing users, opportunities, and applications
+Third-party email/SMS service for notifications
+2.6 Constraints
+Limited and variable internet connectivity in parts of Somalia — UI must remain lightweight
+Small founding team with limited budget — MVP avoids costly third-party integrations
+No formal company registration yet — may limit payment/banking integrations in early phases
+2.7 Pages and Dashboards (summary)
+The MVP has 16 pages (plus one 404 page) and 3 dashboards, one for each role. Page routes and dashboard contents are in Part B, Sections B1 and B2.
+Group
+Pages
+Pages included
+Public
+6
+Landing, Opportunities list, Opportunity details, Competitions list, Login, Register
+Student
+3
+Student dashboard, Student profile, My applications
+Business
+4
+Business dashboard, Company profile, Post / edit opportunity, Applicants list
+Administrator
+3
+Admin dashboard, Verify businesses, Manage listings and users
+2.8 Technology
+The technology stack below is a fixed constraint for the Furan MVP. The team chose it so that one language (TypeScript) is used on both the frontend and the backend. Details, rules, and the production DevOps setup are in Part B, Section B3.
+Layer
+Technology
+Frontend
+React + TypeScript (built with Vite, styled with Tailwind CSS)
+Backend
+Node.js + TypeScript (Express REST API)
+Database
+MySQL 8
+API
+REST with JSON. OpenAPI documentation shared by both teams
+Authentication
+JWT access and refresh tokens
+DevOps
+Docker, GitHub Actions (CI/CD), Nginx, HTTPS, automated backups, monitoring
+Hosting
+Linux server or cloud provider (to be chosen, see Section 11)
+
+3. FUNCTIONAL REQUIREMENTS
+Each requirement below describes one specific system behavior, the actor who performs it, and the expected system response. Priority: High = must work for MVP launch, Medium = needed for MVP but can follow the High items, Low = do last.
+ID
+Actor
+Requirement
+Priority
+FR-001
+Student
+The system shall allow a student to register an account using email and password.
+High
+FR-002
+Student
+The system shall allow a student to create and edit a profile including education, skills, and project links.
+High
+FR-003
+Student
+The system shall allow a student to browse and filter opportunities by type, skill, and deadline.
+High
+FR-004
+Student
+The system shall allow a student to apply to an opportunity using their saved profile.
+High
+FR-005
+Student
+The system shall allow a student to view the status of each application (New, Shortlisted, Rejected, Hired).
+High
+FR-006
+Student
+The system shall allow a student to register for a listed competition.
+Medium
+FR-007
+Business
+The system shall allow a business to register an account and create a company profile.
+High
+FR-008
+Business
+The system shall allow a business to post an opportunity specifying type, title, required skills, and deadline.
+High
+FR-009
+Business
+The system shall allow a business to view a list of applicants for each posted opportunity.
+High
+FR-010
+Business
+The system shall allow a business to change an applicant's status (Shortlisted, Rejected, Hired).
+High
+FR-011
+Business
+The system shall allow a business to edit or close a posted opportunity.
+Medium
+FR-012
+Administrator
+The system shall allow an administrator to verify or reject a newly registered business account.
+High
+FR-013
+Administrator
+The system shall allow an administrator to remove an opportunity listing that violates platform policy.
+Medium
+FR-014
+System
+The system shall send a notification to a student when their application status changes.
+High
+FR-015
+System
+The system shall prevent a student from submitting more than one application to the same opportunity.
+High
+FR-016
+All users
+The system shall allow a registered user to log in and log out using email and password.
+High
+FR-017
+All users
+The system shall allow a user to reset a forgotten password using a link sent to their email.
+Medium
+FR-018
+Business
+The system shall allow a business to view the list of students registered for a competition it posted.
+Medium
+FR-019
+System
+The system shall send a notification to a business when an administrator verifies or rejects its account.
+High
+FR-020
+All users
+The system shall allow a student or business to delete their own account.
+Low
+FR-021
+Administrator
+The system shall allow an administrator to view all users and suspend or reactivate an account.
+Medium
+FR-022
+All users
+The system shall show each logged-in user a dashboard for their role with summary counts (see Part B, Section B2).
+Medium
+FR-023
+Student
+The system shall allow a student to search opportunities by keyword.
+Medium
+FR-016 to FR-023 are new in v1.1. They fill gaps found while checking roles, pages, and use cases.
+3.1 Alternative & Error Flows (selected)
+If a student applies without a complete profile (e.g. missing skills), the system shall prompt them to complete the profile before submitting.
+If a business attempts to post an opportunity before verification is complete, the system shall block the action and display a pending-verification message.
+If an opportunity's deadline has passed, the system shall disable the Apply button and label the listing as Closed.
+If a student tries to apply to the same opportunity again, the system shall block the action and show an "Already applied" message.
+If a user opens a page or action that their role is not allowed to use, the system shall show an "Access denied" message.
+If login fails, the system shall show a general error message that does not say whether the email or the password was wrong.
+If a suspended user tries to log in, the system shall block login and show an account-suspended message.
+4. NON-FUNCTIONAL REQUIREMENTS
+ID
+Category
+Requirement
+NFR-01
+Security
+The system shall store passwords using a one-way salted hash and encrypt data in transit using HTTPS.
+NFR-02
+Performance
+The system shall respond to a standard user request (e.g. loading a listings page) within 3 seconds under normal operating conditions on a 3G connection.
+NFR-03
+Availability
+The system shall maintain at least 99% uptime per month, excluding scheduled maintenance.
+NFR-04
+Reliability
+The system shall preserve application data without loss in the event of a server restart.
+NFR-05
+Usability
+A first-time student user shall be able to complete profile creation in 5 steps or fewer.
+NFR-06
+Accessibility
+The system shall support readable text sizing and sufficient color contrast for users with low vision.
+NFR-07
+Scalability
+The system shall support at least 5,000 registered student users without requiring architectural changes.
+NFR-08
+Maintainability
+The system shall be built with modular components so that individual features can be updated independently.
+NFR-09
+Data privacy
+The system shall not share a student's personal data with a business until the student submits an application.
+NFR-10
+Backup & recovery
+The system shall perform a daily automated backup of the database, retained for at least 30 days.
+NFR-11
+Compatibility
+The system shall work on current versions of Chrome, Safari, and Firefox, and on phone screens as small as 360 px wide.
+NFR-12
+Deployment
+The system shall be built, tested, and deployed by an automated pipeline, with a separate staging environment that is tested before each production release.
+NFR-13
+Monitoring
+The system shall write error logs and shall alert the team within 5 minutes when the production site stops responding.
+5. USER ROLES & PERMISSIONS
+Action
+Student
+Business
+Admin
+View opportunities
+Yes
+All public listings; manages own postings
+All
+Create profile / company profile
+Yes
+Yes
+No
+Post opportunity
+No
+Yes (after verification)
+No
+Apply to opportunity
+Yes
+No
+No
+Register for competition
+Yes
+No
+No
+View applicants / registrants
+No
+Own postings only
+All
+Approve / reject application
+No
+Yes (own postings)
+No
+Verify business accounts
+No
+No
+Yes
+Remove a listing
+No
+Own postings only
+Any listing
+Suspend / reactivate a user
+No
+No
+Yes
+Log in / reset password
+Yes
+Yes
+Yes
+Delete own account
+Yes
+Yes
+N/A
+
+No permission conflicts exist between roles: businesses can only act on their own postings and applicants; administrators have platform-wide moderation access but do not create or apply to opportunities themselves.
+6. EXTERNAL INTERFACES
+6.1 User Interfaces
+Responsive web interface accessible via desktop and mobile browsers.
+6.2 External Systems & Third-Party Services
+Email/SMS provider: Sends notifications for application status changes and account verification (email first; SMS only if budget allows)
+Cloud hosting provider: Hosts the application and database
+Future: Mobile money API (e.g. EVC Plus): Planned for future paid-feature phases; not part of MVP
+6.3 Data Exchanged
+The system exchanges notification data (email/SMS) with the third-party messaging provider, and exchanges no data with payment or mobile-money providers in the MVP phase.
+7. DATA REQUIREMENTS
+7.1 Key Entities & Fields
+Entity
+Fields
+User
+id, role (student/business/admin), name, email, password_hash, status (active/suspended), created_at
+StudentProfile
+user_id, education, skills[], project_links[]
+BusinessProfile
+user_id, company_name, verification_status (pending/verified/rejected)
+Opportunity
+id, posted_by, type (internship/job/competition), title, description, skills_required[], deadline, status (open/closed)
+Application
+id, student_id, opportunity_id, status (new/shortlisted/rejected/hired), submitted_at
+CompetitionRegistration
+id, student_id, opportunity_id (type = competition), registered_at
+Notification
+id, user_id, type, message, channel (email/sms), sent_at
+Fields added in v1.1: User.status, Opportunity.description, and the CompetitionRegistration and Notification entities.
+7.2 Validation Rules
+Email fields must follow a valid email format and be unique per account
+An opportunity's deadline must be a future date at the time of posting
+A student may not submit more than one application per opportunity (see FR-015)
+A student may not register twice for the same competition
+Competition registration is allowed only for opportunities of type competition
+7.3 Data Relationships
+A User has one Profile (Student or Business). A Business posts many Opportunities. A Student submits many Applications, each linked to one Opportunity. A Student can have many CompetitionRegistrations, each linked to one competition Opportunity.
+7.4 Privacy, Storage & Retention
+A student's personal data is only visible to a business after that student applies to its opportunity
+Application data is retained for at least 12 months for reporting purposes. If a student deletes their account (FR-020), their personal details are removed and the application record is kept without personal details for the rest of the 12 months
+Database is backed up daily and retained for 30 days (see NFR-10)
+8. USE CASES & WORKFLOWS
+8.1 Use Case: Student Applies to an Opportunity
+Actor: Student
+Precondition: Student is registered and has a complete profile
+Main flow:
+Student browses or searches opportunities.
+Student selects an opportunity and views details.
+Student clicks Apply.
+System submits the application using the saved profile.
+System confirms submission and updates status to New.
+Alternative flow: If the profile is incomplete, system prompts the student to complete it before applying (see FR-004).
+Error scenario: If the opportunity deadline has passed, the Apply button is disabled (see Section 3.1).
+Expected result: An Application record is created and visible to both student and business.
+8.2 Use Case: Business Posts an Opportunity and Reviews Applicants
+Actor: Business
+Precondition: Business account has been verified by an administrator
+Main flow:
+Business selects "Post opportunity".
+Business enters type, title, required skills, and deadline.
+System publishes the listing.
+Students apply over time.
+Business views the applicant list and reviews profiles.
+Business updates applicant status (Shortlisted/Rejected/Hired).
+Alternative flow: Business edits or closes the listing before the deadline.
+Error scenario: If the business is not yet verified, posting is blocked with a pending-verification message (see Section 3.1).
+Expected result: Opportunity is visible to students; applicant statuses are tracked and visible to the business.
+8.3 Use Case: Administrator Verifies a Business
+Actor: Administrator
+Precondition: A business has registered and its status is pending
+Main flow:
+Administrator opens the Verify businesses page.
+System shows the list of pending businesses.
+Administrator opens one business and checks its details.
+Administrator selects Verify or Reject.
+System saves the decision and notifies the business (FR-019).
+Alternative flow: Administrator rejects the business; it cannot post opportunities.
+Expected result: A verified business can post opportunities (see Business rules, Section 10).
+8.4 Use Case: Student Registers for a Competition
+Actor: Student
+Precondition: Student is logged in; the competition is open
+Main flow:
+Student opens the Competitions list and selects a competition.
+Student clicks Register.
+System saves the registration.
+System confirms and shows the competition in the student's dashboard.
+Error scenario: If the deadline has passed or the student is already registered, the system blocks the action and shows a message.
+Expected result: A CompetitionRegistration record is created and visible to the business that posted the competition (FR-018).
+9. REQUIREMENT QUALITY
+Each requirement in this document is written to be clear, specific, unambiguous, complete, consistent, testable, feasible, traceable, and necessary. Requirements use the defined ID scheme (FR-xxx, NFR-xx) so they can be traced to use cases and, later, to test cases.
+10. BUSINESS RULES
+Approval rule: A business account must be verified by an administrator before it may post opportunities.
+Eligibility rule: Only registered students with a complete profile may apply to opportunities.
+Validation rule: An opportunity may not be posted with a deadline in the past.
+Restriction: A student may submit only one application per opportunity.
+Time limit: Applications are not accepted after an opportunity's stated deadline.
+Role-based rule: A business may only view and manage applicants for its own postings.
+Suspension rule: A suspended user cannot log in until an administrator reactivates the account.
+11. ASSUMPTIONS, CONSTRAINTS & DEPENDENCIES
+Assumptions:
+Users have internet access and a smartphone or computer
+Businesses are willing to verify their identity to post listings
+Constraints:
+Limited/variable internet connectivity in parts of Somalia
+Small founding team and limited budget for MVP
+Dependencies:
+Cloud hosting provider (and MySQL service, if the team chooses a managed one)
+Third-party email/SMS notification service
+12. TRACEABILITY
+Each requirement can be traced from business need through to testing. The table shows the main flows. The team extends it as the test plan is written.
+Business need
+FR
+Use case
+Page (Part B)
+API (Part B)
+Test case
+Students need to apply to opportunities
+FR-004
+8.1
+Opportunity details
+POST /opportunities/{id}/applications
+TC-004
+Businesses need to post opportunities
+FR-008
+8.2
+Post / edit opportunity
+POST /opportunities
+TC-008
+Businesses need to review and shortlist
+FR-009, FR-010
+8.2
+Applicants list
+PATCH /applications/{id}/status
+TC-010
+Platform needs trusted businesses
+FR-012
+8.3
+Verify businesses
+PATCH /admin/businesses/{id}/verification
+TC-012
+Students need to join competitions
+FR-006
+8.4
+Competitions list
+POST /opportunities/{id}/registrations
+TC-006
+Students need to know their status
+FR-005, FR-014
+8.1
+My applications
+GET /students/me/applications
+TC-005
+
+Requirement IDs (FR-xxx) remain consistent throughout this document and future project artifacts.
+13. LANGUAGE & DOCUMENTATION QUALITY
+This document uses simple, professional language and avoids vague terms (e.g. "fast", "easy", "user-friendly") in favor of measurable statements, as shown in Section 4. Terminology is used consistently throughout (e.g. "Opportunity", "Applicant" as defined in Section 1.5).
+14. IMPLEMENTATION BOUNDARY
+Part A of this SRS describes WHAT the Furan system must do, not HOW it will be built. Database schema and internal code structure are implementation decisions for the development team and are intentionally outside the requirements, except where they represent an actual constraint (see Sections 2.6 and 2.8). Part B gives the development teams a starting point (pages, API list, stack details, DevOps, and plan). Part B is guidance and can change without changing the requirements, except the technology choices in Section 2.8, which are fixed for the MVP.
+15. FINAL REVIEW CHECKLIST
+System purpose is clear
+Scope is clear (included vs. excluded)
+All major stakeholders are identified
+All user roles are identified
+All major features are documented
+Functional requirements are complete and uniquely identified
+Non-functional requirements are documented and measurable
+User permissions are clear with no conflicts
+Important workflows are documented as use cases
+Error and alternative scenarios are considered
+Business rules are documented explicitly
+Data requirements are clear
+External integrations are documented
+Assumptions and constraints are documented
+Requirements are traceable
+Pages and dashboards are listed
+Tech stack and production DevOps are defined
+Backend and frontend teams have a shared API list and start-up plan
+
+PART B: DEVELOPMENT GUIDE
+For the backend and frontend teams. Use this at the start of development. It is guidance, so the team can change it, but any change to behavior must also change Part A.
+B1. PAGES (16 + 404)
+#
+Page
+Route
+Who
+Main content and requirements
+1
+Landing
+/
+Everyone
+What Furan is, featured opportunities, Sign up buttons
+2
+Opportunities list
+/opportunities
+Everyone
+Search and filters (type, skill, deadline). FR-003, FR-023
+3
+Opportunity details
+/opportunities/:id
+Everyone
+Full details. Apply (FR-004) or Register (FR-006) for logged-in students
+4
+Competitions list
+/competitions
+Everyone
+Opportunities of type competition. FR-006
+5
+Login
+/login
+Everyone
+Login form, forgot-password link. FR-016, FR-017
+6
+Register
+/register
+Everyone
+Choose Student or Business, then sign up. FR-001, FR-007
+7
+Student dashboard
+/student/dashboard
+Student
+See B2. FR-022
+8
+Student profile
+/student/profile
+Student
+Education, skills, project links. FR-002
+9
+My applications
+/student/applications
+Student
+List with status. FR-005
+10
+Business dashboard
+/business/dashboard
+Business
+See B2. FR-022
+11
+Company profile
+/business/profile
+Business
+Company details, verification status. FR-007
+12
+Post / edit opportunity
+/business/opportunities/new and /business/opportunities/:id/edit
+Business (verified)
+Form with type, title, skills, deadline. Close listing. FR-008, FR-011
+13
+Applicants list
+/business/opportunities/:id/applicants
+Business
+Applicants or competition registrants, change status. FR-009, FR-010, FR-018
+14
+Admin dashboard
+/admin/dashboard
+Admin
+See B2. FR-022
+15
+Verify businesses
+/admin/businesses
+Admin
+Pending list, verify or reject. FR-012
+16
+Manage listings and users
+/admin/manage
+Admin
+Remove listings, suspend or reactivate users. FR-013, FR-021
++
+Not found
+*
+Everyone
+Simple 404 page with a link home
+B2. DASHBOARDS (3)
+Dashboard
+What it shows
+Quick actions
+Student
+Applications by status (New, Shortlisted, Rejected, Hired)
+Competitions registered
+Profile complete or not
+Complete profile
+Browse opportunities
+Business
+Active opportunities
+New applicants
+Shortlisted and hired counts
+Verification status
+Post opportunity
+Review applicants
+Admin
+Businesses waiting for verification
+Total students and businesses
+Total active listings
+Verify a business
+Remove a listing
+B3. TECH STACK AND PRODUCTION DEVOPS
+This is the technology stack for Furan. Node.js, TypeScript, MySQL, and React are fixed for the MVP (Section 2.8). Items marked "recommended" are tools that go with them; the team can swap a recommended tool in Week 1 without changing Part A.
+B3.1 Stack summary
+Layer
+Technology
+Why
+Frontend
+React 18 + TypeScript + Vite (fixed)
+Fast build, type safety, large community
+Styling
+Tailwind CSS (recommended)
+Small CSS output, good for 3G and mobile-first
+Routing and data
+React Router, TanStack Query (recommended)
+Role-based route guards; caching means fewer requests on weak connections
+Backend
+Node.js (current LTS) + TypeScript (fixed), Express (recommended)
+One language on both teams; simple and well known
+Database
+MySQL 8, InnoDB (fixed)
+Reliable, relational, fits the entities in Section 7
+ORM and migrations
+Prisma (recommended)
+Typed queries and versioned schema changes
+Validation
+Zod (recommended)
+Same rules as Section 7.2, checked on every request
+Authentication
+JWT (access + refresh tokens), passwords hashed with bcrypt
+Works with a separate frontend. Meets NFR-01
+API documentation
+OpenAPI with Swagger UI
+One shared contract for both teams
+Notifications
+Email through Nodemailer and a provider to be chosen; SMS later
+Matches FR-014 and FR-019 without high cost
+Testing
+Jest + Supertest (backend), Vitest + React Testing Library (frontend)
+At least one test for each FR
+Code quality
+ESLint, Prettier, TypeScript strict mode
+Same style for everyone, fewer bugs
+Design
+Figma
+Page wireframes before coding
+
+B3.2 Backend rules
+Use Node.js current LTS and TypeScript with strict mode on.
+Organise code by feature modules: auth, users, profiles, opportunities, applications, registrations, admin, notifications. Inside each module use routes, controllers, services, and data access (NFR-08).
+Add one role-check middleware (student, business, admin) that enforces the permissions table in Section 5.
+Validate every request body and return the standard error codes listed in B4.
+Add security basics: helmet, CORS limited to the frontend domain, and rate limits on login and password reset.
+Add a GET /health endpoint. The uptime monitor and the deploy pipeline use it.
+B3.3 Frontend rules
+Use React with TypeScript strict mode, built with Vite.
+Load each page lazily (code splitting) to stay under the 1 MB first-load target.
+Design for screens from 360 px wide (NFR-11). Test on a real phone.
+Use the OpenAPI file to type the API calls, so a backend change shows up as a compile error.
+Read the API address from an environment variable, not from code.
+B3.4 Database rules (MySQL)
+Use MySQL 8, InnoDB engine, and utf8mb4 character set (needed for Somali and Arabic names).
+Create the tables from Section 7 with foreign keys. MySQL has no array type, so store skills[] and project_links[] as JSON columns (or as child tables if skill search becomes slow).
+Add unique indexes: User.email, Application (student_id, opportunity_id) for FR-015, and CompetitionRegistration (student_id, opportunity_id).
+Add an index on Opportunity (type, status, deadline) for filters (FR-003) and a FULLTEXT index on title and description for keyword search (FR-023).
+Change the schema only through migration files in the repository. Nobody edits the production database by hand.
+Back up the database every day and keep each backup for 30 days (NFR-10). Store a copy outside the server. Test one restore before launch (NFR-04).
+B3.5 Production DevOps
+The goal is simple: every change is tested automatically, tried on staging, and then released to production in the same way every time.
+Environment
+Purpose
+How it is updated
+Local
+Developers work here. Docker Compose runs frontend, backend, and MySQL with one command
+Developer runs it
+Staging
+Same setup as production with test data. Every feature is checked here
+Deploys automatically when a pull request is merged to main
+Production
+Real users and real data
+Deploys after a team member approves, from a version tag (for example v1.0.0)
+
+
+Source control: GitHub with one repository and two folders, /backend and /frontend. Branch rules are in B7.
+CI (GitHub Actions): on every pull request, install, lint, type-check, run tests, and build. A pull request cannot be merged if any step fails. Also run npm audit to catch unsafe packages.
+CD (GitHub Actions): build Docker images, push them to GitHub Container Registry, and deploy to staging, then to production after approval. To roll back, redeploy the previous image.
+Containers: the backend runs as a Docker container. The frontend is built into static files and served by Nginx.
+Server: a Linux server (Ubuntu LTS) or cloud VM running Docker Compose, with Nginx as the entry point. Nginx serves the frontend and sends /api requests to the backend.
+HTTPS: free certificates from Let's Encrypt, renewed automatically (NFR-01). Optional: Cloudflare in front for caching and extra speed.
+MySQL in production: a provider-managed MySQL if the budget allows. Otherwise a MySQL container on a persistent volume, with the daily backup from B3.4.
+Configuration and secrets: use environment variables. Never commit a .env file. Keep secrets in GitHub Actions secrets and on the server. Use different values for staging and production.
+Logs and monitoring: structured JSON logs from the backend, an uptime monitor on /health that alerts the team by email or phone (NFR-13), and optional error tracking such as Sentry.
+Server security: firewall allows only ports 80, 443, and SSH. SSH keys only, no password login. Update the operating system and packages regularly.
+First admin account: created by a seed script on the server, never by public registration.
+B3.6 Ready-for-launch checklist
+All High-priority FRs pass their tests on staging.
+The production site works over HTTPS only.
+The daily backup runs, and one restore was tested.
+Staging and production use the same setup and different secrets.
+The /health check and the uptime alert are active.
+Rate limits are on for login and password reset.
+The first admin account exists and its password is changed.
+The site loads on a phone in under 3 seconds on a 3G connection (NFR-02).
+B4. API LIST (STARTING POINT)
+Base path: /api/v1. The backend team confirms this list in Week 1 and publishes it as OpenAPI docs. The frontend team can use mock data until each endpoint is ready.
+Method
+Endpoint
+Who
+FR
+POST
+/auth/register/student
+Public
+FR-001
+POST
+/auth/register/business
+Public
+FR-007
+POST
+/auth/login and /auth/logout
+Public / logged in
+FR-016
+POST
+/auth/password-reset and /auth/password-reset/confirm
+Public
+FR-017
+GET, PUT
+/students/me/profile
+Student
+FR-002
+GET, PUT
+/businesses/me/profile
+Business
+FR-007
+GET
+/opportunities?type=&skill=&deadline=&q=
+Public
+FR-003, FR-023
+GET
+/opportunities/{id}
+Public
+FR-003
+POST
+/opportunities
+Verified business
+FR-008
+PUT
+/opportunities/{id}
+Owner business
+FR-011
+POST
+/opportunities/{id}/close
+Owner business
+FR-011
+DELETE
+/opportunities/{id}
+Owner business or admin
+FR-013
+POST
+/opportunities/{id}/applications
+Student
+FR-004, FR-015
+GET
+/students/me/applications
+Student
+FR-005
+GET
+/opportunities/{id}/applications
+Owner business
+FR-009
+PATCH
+/applications/{id}/status
+Owner business
+FR-010, FR-014
+POST
+/opportunities/{id}/registrations
+Student
+FR-006
+GET
+/opportunities/{id}/registrations
+Owner business
+FR-018
+GET
+/admin/businesses?status=pending
+Admin
+FR-012
+PATCH
+/admin/businesses/{id}/verification
+Admin
+FR-012, FR-019
+GET
+/admin/users
+Admin
+FR-021
+PATCH
+/admin/users/{id}/status
+Admin
+FR-021
+DELETE
+/users/me
+Logged in
+FR-020
+GET
+/dashboard/summary
+Logged in (by role)
+FR-022
+
+Standard responses: 400 invalid data, 401 not logged in, 403 not allowed for this role, 404 not found, 409 duplicate (for example, already applied).
+B5. WHO DOES WHAT
+Backend team
+Set up the Node.js + TypeScript (Express) project, MySQL with Prisma, and Docker Compose
+Create the data models and migrations from Section 7 (Prisma)
+Build login, JWT, and role checks from the permissions table in Section 5
+Build endpoints in this order: auth, profiles, opportunities, applications, registrations, admin, dashboard summary
+Build email notifications for FR-014 and FR-019
+Publish and update the OpenAPI docs after every API change
+Write at least one test for each FR
+Add a Dockerfile, a GET /health endpoint, and environment-variable settings (B3.2)
+Frontend team
+Set up React, TypeScript, Vite, Tailwind, and routing
+Draw Figma wireframes for the 16 pages before coding them
+Build shared parts first: layout, navbar, form fields, cards, status badges, tables
+Add route guards so each role can only open its own pages (Section 5)
+Build pages in this order: public, login/register, student, business, admin
+Use mock data until the API is ready
+Show loading, empty, and error states from Section 3.1
+Keep pages light and mobile-first. Target under 1 MB on first load (team to confirm)
+DevOps (one person leads, shared by both teams)
+Create the GitHub Actions CI pipeline in Week 1: lint, type-check, test, build
+Prepare the staging server and the deploy pipeline before Week 5, so every feature can be tested on staging
+Set up HTTPS, Nginx, the daily MySQL backup, and the uptime monitor before the release week
+Write a short README on how to run locally, deploy, and roll back
+Both teams
+Agree on the API list in Week 1 before writing page code
+Review each other's pull requests
+Test each feature against its FR before marking it done
+B6. START-UP PLAN (SUGGESTED)
+Adjust the weeks to your real deadline.
+Week
+Backend
+Frontend
+1. Setup
+Repo, Node.js + TypeScript, MySQL, Docker, data models, draft OpenAPI docs, CI pipeline
+Repo, Vite, Tailwind, routing, layout, Figma wireframes
+2. Auth and public
+Register, login, JWT, roles. Read endpoints for opportunities
+Landing, Login, Register, Opportunities list and details
+3. Student flow
+Student profile, applications, duplicate check, competition registration
+Student profile, Apply, My applications, Competitions, Student dashboard
+4. Business flow
+Company profile, post/edit/close, applicants, status change
+Company profile, Post/edit form, Applicants list, Business dashboard
+5. Admin and alerts
+Verification, remove listing, user management, email notifications, dashboard summary
+Admin pages and dashboard, error and empty states
+6. Test and release
+Fix bugs, run tests, deploy to staging, then production
+Fix bugs, test on phone, final polish
+B7. WORKING RULES
+Keep two folders in one repository: /backend and /frontend
+Do not commit directly to main. Use a branch for each feature, named with the requirement ID (example: feature/FR-004-apply)
+Put the requirement ID in each pull request title
+Every pull request needs one review from another team member
+A pull request can be merged only when CI passes (lint, type-check, tests, build)
+A feature is done when: it works as the FR says, it has a test, it was reviewed, the API docs are updated, and it works on a phone-size screen
+B8. OPEN QUESTIONS
+The team should answer these in Week 1.
+Which hosting provider, domain name, and email service will we use?
+How does an administrator check a business (documents, phone call, or other proof)?
+Will the platform be English only, or English and Somali?
+Do competitions need extra fields (prize, team size, start date)?
+Is SMS needed in the MVP, or email only?

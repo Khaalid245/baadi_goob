@@ -1,0 +1,174 @@
+openapi: 3.0.0
+info:
+  title: Furan MVP API
+  version: 1.0.0
+servers:
+  - url: /api/v1
+paths:
+  /auth/register/student:
+    post:
+      summary: Register student
+      responses:
+        '201':
+          description: Created
+  /auth/register/business:
+    post:
+      summary: Register business
+      responses:
+        '201':
+          description: Created
+  /auth/login:
+    post:
+      summary: Log in
+      responses:
+        '200':
+          description: OK
+  /auth/logout:
+    post:
+      summary: Log out
+      responses:
+        '200':
+          description: OK
+  /auth/password-reset:
+    post:
+      summary: Request password reset
+      responses:
+        '200':
+          description: OK
+  /auth/password-reset/confirm:
+    post:
+      summary: Confirm password reset
+      responses:
+        '200':
+          description: OK
+  /students/me/profile:
+    get:
+      summary: Get student profile
+      responses:
+        '200':
+          description: OK
+    put:
+      summary: Update student profile
+      responses:
+        '200':
+          description: OK
+  /businesses/me/profile:
+    get:
+      summary: Get business profile
+      responses:
+        '200':
+          description: OK
+    put:
+      summary: Update business profile
+      responses:
+        '200':
+          description: OK
+  /opportunities:
+    get:
+      summary: List opportunities
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Post opportunity
+      responses:
+        '201':
+          description: Created
+  /opportunities/{id}:
+    get:
+      summary: Get opportunity details
+      responses:
+        '200':
+          description: OK
+    put:
+      summary: Update opportunity
+      responses:
+        '200':
+          description: OK
+    delete:
+      summary: Delete opportunity
+      responses:
+        '204':
+          description: No content
+  /opportunities/{id}/close:
+    post:
+      summary: Close opportunity
+      responses:
+        '200':
+          description: OK
+  /opportunities/{id}/applications:
+    post:
+      summary: Apply to opportunity
+      responses:
+        '201':
+          description: Created
+    get:
+      summary: Get applications for opportunity
+      responses:
+        '200':
+          description: OK
+  /students/me/applications:
+    get:
+      summary: Get my applications
+      responses:
+        '200':
+          description: OK
+  /applications/{id}/status:
+    patch:
+      summary: Update application status
+      responses:
+        '200':
+          description: OK
+  /opportunities/{id}/registrations:
+    post:
+      summary: Register for competition
+      responses:
+        '201':
+          description: Created
+    get:
+      summary: Get registrations for competition
+      responses:
+        '200':
+          description: OK
+  /admin/businesses:
+    get:
+      summary: List pending businesses
+      responses:
+        '200':
+          description: OK
+  /admin/businesses/{id}/verification:
+    patch:
+      summary: Verify or reject business
+      responses:
+        '200':
+          description: OK
+  /admin/users:
+    get:
+      summary: List users
+      responses:
+        '200':
+          description: OK
+  /admin/users/{id}/status:
+    patch:
+      summary: Update user status
+      responses:
+        '200':
+          description: OK
+  /users/me:
+    delete:
+      summary: Delete my account
+      responses:
+        '204':
+          description: No content
+  /dashboard/summary:
+    get:
+      summary: Get dashboard summary
+      responses:
+        '200':
+          description: OK
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
