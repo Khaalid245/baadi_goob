@@ -25,13 +25,17 @@ A two-sided platform connecting Somali students with internships, jobs, and comp
 
 3. **Install Dependencies Locally (for IDE/Intellisense)**:
    ```bash
-   cd backend && npm install
-   cd ../frontend && npm install
+   cd backend
+   npm install
+   cd ../frontend
+   npm install
+   cd ..
    ```
 
 4. **Database Migrations and Seed**:
    Run the following exact commands from the `/backend` folder:
    ```bash
+   cd backend
    npx prisma generate
    npx prisma migrate dev --name init
    npm run prisma:seed
@@ -44,8 +48,16 @@ A two-sided platform connecting Somali students with internships, jobs, and comp
    ```
 
 5. **Run Tests**:
-   - Backend: `cd backend && npm test`
-   - Frontend: `cd frontend && npm test`
+   - Backend: 
+     ```bash
+     cd backend
+     npm test
+     ```
+   - Frontend: 
+     ```bash
+     cd frontend
+     npm test
+     ```
 
 ## Architecture
 - **Frontend**: React, Vite, Tailwind, React Router, TanStack Query.
