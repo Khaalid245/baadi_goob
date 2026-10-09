@@ -1,5 +1,7 @@
 import { Outlet, Link } from 'react-router-dom';
 
+const currentYear = new Date().getFullYear();
+
 export default function Layout() {
   return (
     <div className="flex flex-col min-h-screen">
@@ -17,7 +19,7 @@ export default function Layout() {
         <Outlet />
       </main>
       <footer className="bg-gray-800 text-white p-4 text-center mt-auto">
-        <p>&copy; {new Date().getFullYear()} Furan</p>
+        <p>&copy; {currentYear} Furan</p>
       </footer>
     </div>
   );

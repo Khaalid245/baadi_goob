@@ -16,7 +16,7 @@ A two-sided platform connecting Somali students with internships, jobs, and comp
 
 2. **Run Locally with Docker Compose**:
    ```bash
-   docker compose up --build
+   docker compose up --build -d
    ```
    This will start:
    - MySQL on port 3306
@@ -30,12 +30,18 @@ A two-sided platform connecting Somali students with internships, jobs, and comp
    ```
 
 4. **Database Migrations and Seed**:
-   Run the following from the `/backend` folder:
+   Run the following exact commands from the `/backend` folder:
    ```bash
+   npx prisma generate
    npx prisma migrate dev --name init
    npm run prisma:seed
    ```
-   *(Note: For the seed, it will use the `ADMIN_PASSWORD` from `.env` to create the admin user `admin@furan.local`)*
+   *(Note: For the seed, it will use the `ADMIN_PASSWORD` from `.env` to create the admin user `admin@furan.local`. If you encounter a global Prisma agent skills bug, the `npx prisma` commands will use your local project's Prisma binary).*
+   
+   To deploy migrations in production (or inside Docker):
+   ```bash
+   npx prisma migrate deploy
+   ```
 
 5. **Run Tests**:
    - Backend: `cd backend && npm test`
