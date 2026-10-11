@@ -7,7 +7,8 @@ import YAML from "yamljs";
 import path from "path";
 import fs from "fs";
 
-import { errorHandler, notFoundHandler } from "./common/errorHandler";
+import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
+import { authRouter } from "./routes/auth.routes";
 
 export const app = express();
 
@@ -26,6 +27,9 @@ app.use(
 app.get("/api/v1/health", (_req: Request, res: Response) => {
   res.status(200).json({ status: "ok" });
 });
+
+// Authentication routes
+app.use("/api/v1/auth", authRouter);
 
 // Swagger API Documentation
 const swaggerPath = path.resolve(__dirname, "../../docs/openapi.yaml");
