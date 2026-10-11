@@ -1,7 +1,8 @@
 import bcrypt from "bcryptjs";
 import { Prisma, Role, UserStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma";
-import { RegisterInput } from "../validations/auth.validation";
+import { generateToken } from "../common/jwt";
+import { RegisterInput, LoginInput } from "../validations/auth.validation";
 import { AppError } from "../middleware/errorHandler";
 
 const BCRYPT_SALT_ROUNDS = 10;
@@ -13,6 +14,11 @@ export interface SafeUser {
   role: Role;
   status: UserStatus;
   created_at: Date;
+}
+
+export interface LoginResult {
+  user: SafeUser;
+  token: string;
 }
 
 /**
@@ -67,4 +73,50 @@ export const registerUser = async (input: RegisterInput): Promise<SafeUser> => {
 
     throw error;
   }
+};
+
+/**
+ * Authenticates user credentials and issues a signed JWT token.
+ * Returns identical 401 error for nonexistent emails and incorrect passwords.
+ * Rejects suspended accounts with HTTP 403 without issuing a token.
+ */
+export const loginUser = async (input: LoginInput): Promise<LoginResult> => {
+  const { email, password } = input;
+
+  const user = await prisma.user.findUnique({
+    where: { email },
+  });
+
+  if (!user) {
+    throw new AppError("Invalid email or password", 401);
+  }
+
+  const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+  if (!isPasswordValid) {
+    throw new AppError("Invalid email or password", 401);
+  }
+
+  if (user.status === UserStatus.SUSPENDED) {
+    throw new AppError("Account is suspended. Please contact support.", 403);
+  }
+
+  const token = generateToken({
+    id: user.id,
+    email: user.email,
+    role: user.role,
+  });
+
+  const safeUser: SafeUser = {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    status: user.status,
+    created_at: user.created_at,
+  };
+
+  return {
+    user: safeUser,
+    token,
+  };
 };

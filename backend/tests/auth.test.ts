@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { app } from "../src/app";
 import { prisma } from "../src/lib/prisma";
+import { verifyToken } from "../src/common/jwt";
 
 describe("POST /api/v1/auth/register", () => {
   const runId = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -301,6 +302,267 @@ describe("POST /api/v1/auth/register", () => {
 
     it("should return 400 when request body is empty", async () => {
       const res = await request(app).post("/api/v1/auth/register").send({});
+
+      expect(res.status).toBe(400);
+      expect(res.body).toHaveProperty("error");
+    });
+  });
+});
+
+describe("POST /api/v1/auth/login", () => {
+  const loginRunId = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const loginEmails = new Set<string>();
+
+  const generateLoginEmail = (prefix: string): string => {
+    const email = `${prefix}_${loginRunId}_${Math.random().toString(36).slice(2, 6)}@test.local`.toLowerCase();
+    loginEmails.add(email);
+    return email;
+  };
+
+  afterAll(async () => {
+    if (loginEmails.size > 0) {
+      await prisma.user.deleteMany({
+        where: {
+          email: { in: Array.from(loginEmails) },
+        },
+      });
+    }
+  });
+
+  describe("Successful Logins", () => {
+    it("should authenticate a STUDENT user with valid credentials (status 200) and issue a JWT token", async () => {
+      const email = generateLoginEmail("student_login");
+      const password = "ValidPassword123!";
+
+      // Register user first
+      const regRes = await request(app).post("/api/v1/auth/register").send({
+        name: "Login Student",
+        email,
+        password,
+      });
+      expect(regRes.status).toBe(201);
+
+      // Login
+      const res = await request(app).post("/api/v1/auth/login").send({
+        email,
+        password,
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty("message", "Login successful");
+      expect(res.body).toHaveProperty("user");
+      expect(res.body).toHaveProperty("token");
+
+      const { user, token } = res.body;
+      expect(user.email).toBe(email);
+      expect(user.role).toBe("STUDENT");
+      expect(user.status).toBe("ACTIVE");
+      expect(typeof token).toBe("string");
+      expect(token.split(".").length).toBe(3);
+
+      // Verify token payload
+      const decoded = verifyToken(token);
+      expect(decoded.id).toBe(user.id);
+      expect(decoded.email).toBe(email);
+      expect(decoded.role).toBe("STUDENT");
+
+      // Verify no sensitive fields
+      expect(user.password).toBeUndefined();
+      expect(user.password_hash).toBeUndefined();
+      expect((res.body as Record<string, unknown>).password_hash).toBeUndefined();
+    });
+
+    it("should authenticate a BUSINESS user with valid credentials (status 200)", async () => {
+      const email = generateLoginEmail("biz_login");
+      const password = "BizPassword123!";
+
+      await request(app).post("/api/v1/auth/register").send({
+        name: "Login Business",
+        email,
+        password,
+        role: "BUSINESS",
+      });
+
+      const res = await request(app).post("/api/v1/auth/login").send({
+        email,
+        password,
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.body.user.role).toBe("BUSINESS");
+      expect(typeof res.body.token).toBe("string");
+    });
+
+    it("should allow login with case-insensitive email input", async () => {
+      const email = generateLoginEmail("case_login");
+      const password = "ValidPassword123!";
+
+      await request(app).post("/api/v1/auth/register").send({
+        name: "Case User",
+        email,
+        password,
+      });
+
+      // Login using uppercase email
+      const res = await request(app).post("/api/v1/auth/login").send({
+        email: email.toUpperCase(),
+        password,
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.body.user.email).toBe(email.toLowerCase());
+      expect(typeof res.body.token).toBe("string");
+    });
+  });
+
+  describe("Credential Failures & Security", () => {
+    it("should reject login with wrong password (status 401)", async () => {
+      const email = generateLoginEmail("wrong_pw");
+      const password = "CorrectPassword123!";
+
+      await request(app).post("/api/v1/auth/register").send({
+        name: "Wrong PW User",
+        email,
+        password,
+      });
+
+      const res = await request(app).post("/api/v1/auth/login").send({
+        email,
+        password: "IncorrectPassword999!",
+      });
+
+      expect(res.status).toBe(401);
+      expect(res.body).toEqual({ error: "Invalid email or password" });
+    });
+
+    it("should reject login for nonexistent email (status 401)", async () => {
+      const email = generateLoginEmail("nonexistent");
+
+      const res = await request(app).post("/api/v1/auth/login").send({
+        email,
+        password: "SomePassword123!",
+      });
+
+      expect(res.status).toBe(401);
+      expect(res.body).toEqual({ error: "Invalid email or password" });
+    });
+
+    it("should return identical generic error messages for wrong password and nonexistent email", async () => {
+      const email = generateLoginEmail("identical_err");
+      const password = "CorrectPassword123!";
+
+      await request(app).post("/api/v1/auth/register").send({
+        name: "Identical Err User",
+        email,
+        password,
+      });
+
+      const wrongPwRes = await request(app).post("/api/v1/auth/login").send({
+        email,
+        password: "WrongPassword123!",
+      });
+
+      const nonexistentRes = await request(app).post("/api/v1/auth/login").send({
+        email: generateLoginEmail("definitely_not_registered"),
+        password: "AnyPassword123!",
+      });
+
+      expect(wrongPwRes.status).toBe(401);
+      expect(nonexistentRes.status).toBe(401);
+      expect(wrongPwRes.body).toEqual(nonexistentRes.body);
+      expect(wrongPwRes.body).toEqual({ error: "Invalid email or password" });
+    });
+
+    it("should reject SUSPENDED accounts with status 403 and issue no token", async () => {
+      const email = generateLoginEmail("suspended_user");
+      const password = "ValidPassword123!";
+
+      // Register user
+      const regRes = await request(app).post("/api/v1/auth/register").send({
+        name: "Suspended User",
+        email,
+        password,
+      });
+      expect(regRes.status).toBe(201);
+
+      // Manually suspend the user in the database
+      await prisma.user.update({
+        where: { email },
+        data: { status: "SUSPENDED" },
+      });
+
+      // Attempt login with correct credentials
+      const res = await request(app).post("/api/v1/auth/login").send({
+        email,
+        password,
+      });
+
+      expect(res.status).toBe(403);
+      expect(res.body).toHaveProperty("error");
+      expect(res.body.error).toContain("Account is suspended");
+      expect((res.body as Record<string, unknown>).token).toBeUndefined();
+    });
+
+    it("should never expose password or password_hash in login response or error", async () => {
+      const email = generateLoginEmail("no_leak");
+      const password = "ValidPassword123!";
+
+      await request(app).post("/api/v1/auth/register").send({
+        name: "No Leak User",
+        email,
+        password,
+      });
+
+      const successRes = await request(app).post("/api/v1/auth/login").send({
+        email,
+        password,
+      });
+
+      expect(successRes.body.user.password).toBeUndefined();
+      expect(successRes.body.user.password_hash).toBeUndefined();
+      expect((successRes.body as Record<string, unknown>).password_hash).toBeUndefined();
+
+      const failRes = await request(app).post("/api/v1/auth/login").send({
+        email,
+        password: "WrongPassword!",
+      });
+
+      expect(JSON.stringify(failRes.body)).not.toContain("password_hash");
+    });
+  });
+
+  describe("Validation Errors (400 Bad Request)", () => {
+    it("should return 400 when email is missing", async () => {
+      const res = await request(app).post("/api/v1/auth/login").send({
+        password: "ValidPassword123!",
+      });
+
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({ error: "Email is required" });
+    });
+
+    it("should return 400 when email has invalid format", async () => {
+      const res = await request(app).post("/api/v1/auth/login").send({
+        email: "not-an-email",
+        password: "ValidPassword123!",
+      });
+
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({ error: "Invalid email address" });
+    });
+
+    it("should return 400 when password is missing or empty", async () => {
+      const res = await request(app).post("/api/v1/auth/login").send({
+        email: generateLoginEmail("missing_pw"),
+        password: "",
+      });
+
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({ error: "Password is required" });
+    });
+
+    it("should return 400 when request body is empty", async () => {
+      const res = await request(app).post("/api/v1/auth/login").send({});
 
       expect(res.status).toBe(400);
       expect(res.body).toHaveProperty("error");
