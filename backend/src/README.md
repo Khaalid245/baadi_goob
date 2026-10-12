@@ -20,15 +20,16 @@ Use this list to navigate the codebase in the order a request travels through th
 ### 4. `validations/auth.validation.ts`
 - **Responsibility:** Defines Zod schemas that validate the format, length, and allowed values of incoming request data before any processing occurs.
 
-### 5. `middleware/errorHandler.ts`
-- **Responsibility:** Intercepts operational errors and unhandled exceptions globally to return consistent, secure JSON error responses without leaking server secrets.
+### 5. `middleware/` (`auth.middleware.ts`, `roleCheck.ts`, `errorHandler.ts`)
+- **`auth.middleware.ts`:** Extracts and verifies Bearer JWT tokens, attaching the authenticated user payload to `req.user`.
+- **`roleCheck.ts`:** Enforces role-based access control against `req.user.role`.
+- **`errorHandler.ts`:** Intercepts operational errors and unhandled exceptions globally to return consistent, secure JSON error responses without leaking server secrets.
 
 ### 6. `lib/prisma.ts`
 - **Responsibility:** Provides the shared Prisma database client singleton with hot-reload caching to prevent multiple database connections during development.
 
-### 7. `common/jwt.ts` and `common/roleCheck.ts`
+### 7. `common/jwt.ts`
 - **`common/jwt.ts`:** Generates and verifies JSON Web Tokens with typed payload validation and secure expiration defaults.
-- **`common/roleCheck.ts`:** Provides role-based access control helpers to protect endpoints based on user permissions.
 
 ---
 

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { registerSchema, loginSchema } from "../validations/auth.validation";
 import { registerUser, loginUser } from "../services/auth.service";
+import { AppError } from "../middleware/errorHandler";
 
 export const register = async (
   req: Request,
@@ -47,6 +48,28 @@ export const login = async (
       message: "Login successful",
       user,
       token,
+    });
+  } catch (error: unknown) {
+    next(error);
+  }
+};
+
+export const getMe = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  try {
+    if (!req.user) {
+      return next(new AppError("Authentication required", 401));
+    }
+
+    res.status(200).json({
+      user: {
+        id: req.user.id,
+        email: req.user.email,
+        role: req.user.role,
+      },
     });
   } catch (error: unknown) {
     next(error);
