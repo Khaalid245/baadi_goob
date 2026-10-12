@@ -5,6 +5,19 @@ export interface CustomError extends Error {
   statusCode?: number;
 }
 
+export class AppError extends Error {
+  public status: number;
+  public statusCode: number;
+
+  constructor(message: string, statusCode: number = 500) {
+    super(message);
+    this.name = "AppError";
+    this.statusCode = statusCode;
+    this.status = statusCode;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
 /**
  * 404 Not Found handler for unmatched routes.
  * Placed after all route declarations so it catches any unhandled API path.
@@ -53,7 +66,6 @@ export const errorHandler = (
   } else if (process.env.NODE_ENV !== "test") {
     console.error(err);
   }
-
 
   // Obfuscate internal 500 messages to prevent secret or stack trace leakage
   const message =

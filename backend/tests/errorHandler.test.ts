@@ -1,5 +1,10 @@
 import { Request, Response, NextFunction } from "express";
-import { errorHandler, notFoundHandler, CustomError } from "../src/common/errorHandler";
+import {
+  errorHandler,
+  notFoundHandler,
+  CustomError,
+  AppError,
+} from "../src/middleware/errorHandler";
 
 describe("Error Handlers Unit Tests", () => {
   let mockReq: Partial<Request>;
@@ -54,6 +59,15 @@ describe("Error Handlers Unit Tests", () => {
 
       expect(statusMock).toHaveBeenCalledWith(422);
       expect(jsonMock).toHaveBeenCalledWith({ error: "Invalid request data" });
+    });
+
+    it("should return operational status and message when using AppError", () => {
+      const appErr = new AppError("Resource conflict", 409);
+
+      errorHandler(appErr, mockReq as Request, mockRes as Response, mockNext);
+
+      expect(statusMock).toHaveBeenCalledWith(409);
+      expect(jsonMock).toHaveBeenCalledWith({ error: "Resource conflict" });
     });
 
     it("should return 500 with 'Internal Server Error' and conceal internal details/stack", () => {
