@@ -44,25 +44,153 @@ paths:
   /students/me/profile:
     get:
       summary: Get student profile
+      description: Returns the student profile for the authenticated student user. Returns 404 if profile has not been created yet.
+      security:
+        - bearerAuth: []
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profile:
+                    $ref: '#/components/schemas/StudentProfile'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (Access denied or account suspended)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Profile not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     put:
       summary: Update student profile
+      description: Creates or updates the student profile for the authenticated student user. Preserves omitted fields on partial update, and clears explicitly null fields. Unknown fields are rejected with 400.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateStudentProfileRequest'
       responses:
         '200':
-          description: OK
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  profile:
+                    $ref: '#/components/schemas/StudentProfile'
+        '400':
+          description: Invalid input or unknown fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (Access denied or account suspended)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /businesses/me/profile:
     get:
       summary: Get business profile
+      description: Returns the business profile for the authenticated business user. Returns 404 if profile has not been created yet.
+      security:
+        - bearerAuth: []
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profile:
+                    $ref: '#/components/schemas/BusinessProfile'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (Access denied or account suspended)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Profile not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     put:
       summary: Update business profile
+      description: Creates or updates the business profile for the authenticated business user. Requires valid company_name. Verification status defaults to PENDING and cannot be updated. Unknown fields are rejected with 400.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBusinessProfileRequest'
       responses:
         '200':
-          description: OK
+          description: Company profile updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  profile:
+                    $ref: '#/components/schemas/BusinessProfile'
+        '400':
+          description: Invalid input or unknown fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (Access denied or account suspended)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /opportunities:
     get:
       summary: List opportunities
@@ -172,3 +300,96 @@ paths:
       responses:
         '200':
           description: OK
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+    StudentProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        education:
+          type: string
+          nullable: true
+        skills:
+          type: array
+          items:
+            type: string
+          nullable: true
+        project_links:
+          type: array
+          items:
+            type: string
+            format: uri
+          nullable: true
+      required:
+        - id
+        - user_id
+    UpdateStudentProfileRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        education:
+          type: string
+          nullable: true
+          maxLength: 191
+        skills:
+          type: array
+          items:
+            type: string
+            maxLength: 50
+          maxItems: 30
+          nullable: true
+        project_links:
+          type: array
+          items:
+            type: string
+            format: uri
+            maxLength: 255
+          maxItems: 10
+          nullable: true
+    BusinessProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        company_name:
+          type: string
+        verification_status:
+          type: string
+          enum: [PENDING, VERIFIED, REJECTED]
+      required:
+        - id
+        - user_id
+        - company_name
+        - verification_status
+    UpdateBusinessProfileRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - company_name
+      properties:
+        company_name:
+          type: string
+          minLength: 2
+          maxLength: 191
