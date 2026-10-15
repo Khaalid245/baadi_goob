@@ -194,36 +194,274 @@ paths:
   /opportunities:
     get:
       summary: List opportunities
+      description: Returns a paginated list of opportunities. Supports filtering by type, skill, deadline, and keyword search (q). Returns expired and closed listings with status indicators.
+      parameters:
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [INTERNSHIP, JOB, COMPETITION]
+          description: Filter by opportunity type
+        - in: query
+          name: skill
+          schema:
+            type: string
+          description: Filter by required skill
+        - in: query
+          name: deadline
+          schema:
+            type: string
+          description: Filter by deadline date or datetime
+        - in: query
+          name: deadline_operator
+          schema:
+            type: string
+            enum: [gte, lte]
+            default: gte
+          description: Operator for deadline filter (gte or lte)
+        - in: query
+          name: q
+          schema:
+            type: string
+          description: Keyword search across title and description
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [OPEN, CLOSED]
+          description: Optional filter by status
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          description: Page number
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+          description: Items per page
       responses:
         '200':
-          description: OK
+          description: List of opportunities
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpportunityListResponse'
+        '400':
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     post:
       summary: Post opportunity
+      description: Allows an authenticated, verified business user to create a new opportunity listing.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOpportunityRequest'
       responses:
         '201':
-          description: Created
+          description: Opportunity created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateOpportunityResponse'
+        '400':
+          description: Invalid input or unknown fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (Access denied, missing profile, or pending/rejected verification)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /opportunities/{id}:
     get:
       summary: Get opportunity details
+      description: Returns details of a specific opportunity by ID.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Opportunity unique identifier
       responses:
         '200':
-          description: OK
+          description: Opportunity details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpportunityDetailResponse'
+        '400':
+          description: Invalid opportunity ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Opportunity not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     put:
       summary: Update opportunity
+      description: Allows the owning business to edit an existing opportunity. Supports partial updates for type, title, description, skills_required, and deadline.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Opportunity unique identifier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOpportunityRequest'
       responses:
         '200':
-          description: OK
+          description: Opportunity updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateOpportunityResponse'
+        '400':
+          description: Invalid input or unknown fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (Access denied or not the owner business)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Opportunity not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     delete:
       summary: Delete opportunity
+      description: Deletes an opportunity listing. Allowed for the owning business or a platform administrator. Restricted to opportunities with zero applications and zero competition registrations to protect the 12-month data retention policy.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Opportunity unique identifier
       responses:
         '204':
-          description: No content
+          description: Opportunity deleted successfully (No content)
+        '400':
+          description: Invalid opportunity ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (Access denied or not the owner business)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Opportunity not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict (Cannot delete opportunity with existing applications or registrations)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /opportunities/{id}/close:
     post:
       summary: Close opportunity
+      description: Closes an active opportunity. Only the business that originally posted the opportunity may close it. This operation is idempotent; closing an already closed opportunity succeeds without unintended changes.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Opportunity unique identifier
       responses:
         '200':
-          description: OK
+          description: Opportunity closed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CloseOpportunityResponse'
+        '400':
+          description: Invalid opportunity ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (Access denied or not the owner business)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Opportunity not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /opportunities/{id}/applications:
     post:
       summary: Apply to opportunity
@@ -393,3 +631,188 @@ components:
           type: string
           minLength: 2
           maxLength: 191
+    Opportunity:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        posted_by:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [INTERNSHIP, JOB, COMPETITION]
+        title:
+          type: string
+        description:
+          type: string
+        skills_required:
+          type: array
+          items:
+            type: string
+          nullable: true
+        deadline:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [OPEN, CLOSED]
+        is_expired:
+          type: boolean
+        effective_status:
+          type: string
+          enum: [OPEN, CLOSED, EXPIRED]
+        company_name:
+          type: string
+          nullable: true
+      required:
+        - id
+        - posted_by
+        - type
+        - title
+        - description
+        - deadline
+        - status
+        - is_expired
+        - effective_status
+    PaginationMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalPages:
+          type: integer
+        hasNextPage:
+          type: boolean
+        hasPrevPage:
+          type: boolean
+      required:
+        - total
+        - page
+        - limit
+        - totalPages
+        - hasNextPage
+        - hasPrevPage
+    OpportunityListResponse:
+      type: object
+      properties:
+        opportunities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Opportunity'
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalPages:
+          type: integer
+      required:
+        - opportunities
+        - pagination
+        - total
+        - page
+        - limit
+        - totalPages
+    OpportunityDetailResponse:
+      type: object
+      properties:
+        opportunity:
+          $ref: '#/components/schemas/Opportunity'
+      required:
+        - opportunity
+    CreateOpportunityRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - type
+        - title
+        - description
+        - deadline
+      properties:
+        type:
+          type: string
+          enum: [INTERNSHIP, JOB, COMPETITION]
+        title:
+          type: string
+          minLength: 3
+          maxLength: 191
+        description:
+          type: string
+          minLength: 10
+          maxLength: 10000
+        skills_required:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 50
+          maxItems: 30
+          nullable: true
+        deadline:
+          type: string
+          format: date-time
+    CreateOpportunityResponse:
+      type: object
+      required:
+        - message
+        - opportunity
+      properties:
+        message:
+          type: string
+        opportunity:
+          $ref: '#/components/schemas/Opportunity'
+    UpdateOpportunityRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: [INTERNSHIP, JOB, COMPETITION]
+        title:
+          type: string
+          minLength: 3
+          maxLength: 191
+        description:
+          type: string
+          minLength: 10
+          maxLength: 10000
+        skills_required:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 50
+          maxItems: 30
+          nullable: true
+        deadline:
+          type: string
+          format: date-time
+    UpdateOpportunityResponse:
+      type: object
+      required:
+        - message
+        - opportunity
+      properties:
+        message:
+          type: string
+        opportunity:
+          $ref: '#/components/schemas/Opportunity'
+    CloseOpportunityResponse:
+      type: object
+      required:
+        - message
+        - opportunity
+      properties:
+        message:
+          type: string
+        opportunity:
+          $ref: '#/components/schemas/Opportunity'
