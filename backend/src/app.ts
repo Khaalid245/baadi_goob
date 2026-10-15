@@ -11,6 +11,7 @@ import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { authRouter } from "./routes/auth.routes";
 import { studentRouter } from "./routes/student.routes";
 import { businessRouter } from "./routes/business.routes";
+import { opportunityRouter } from "./routes/opportunity.routes";
 
 export const app = express();
 
@@ -36,6 +37,9 @@ app.use("/api/v1/auth", authRouter);
 // Profile routes
 app.use("/api/v1/students", studentRouter);
 app.use("/api/v1/businesses", businessRouter);
+
+// Opportunity routes
+app.use("/api/v1/opportunities", opportunityRouter);
 
 // Swagger API Documentation
 const swaggerPath = path.resolve(__dirname, "../../docs/openapi.yaml");
