@@ -736,16 +736,109 @@ paths:
           description: OK
   /admin/businesses:
     get:
-      summary: List pending businesses
+      summary: List businesses for verification
+      description: Returns a paginated list of businesses filtered by verification status (FR-012). Accessible to administrators only. Defaults to pending businesses.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [PENDING, VERIFIED, REJECTED]
+            default: PENDING
+          description: Filter by business verification status (case-insensitive)
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Page number for pagination
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+          description: Number of items per page
       responses:
         '200':
-          description: OK
+          description: Paginated list of businesses
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminBusinessesListResponse'
+        '400':
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (Access denied or account suspended)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /admin/businesses/{id}/verification:
     patch:
-      summary: Verify or reject business
+      summary: Verify or reject a business account
+      description: Allows an administrator to verify or reject a newly registered business account (FR-012, FR-019). Atomically creates an in-database notification for the business.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique identifier of the business (Profile ID or User ID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyBusinessRequest'
       responses:
         '200':
-          description: OK
+          description: Business verification status updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyBusinessResponse'
+        '400':
+          description: Invalid business ID, invalid verification decision, non-business account, or invalid status transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (Access denied or account suspended)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Business not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /admin/users:
     get:
       summary: List users
@@ -1306,3 +1399,104 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CompetitionRegistrantItem'
+    AdminBusinessUser:
+      type: object
+      required:
+        - id
+        - name
+        - email
+        - role
+        - status
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [BUSINESS]
+        status:
+          type: string
+          enum: [ACTIVE, SUSPENDED]
+        created_at:
+          type: string
+          format: date-time
+    AdminBusinessDetails:
+      type: object
+      required:
+        - id
+        - user_id
+        - company_name
+        - verification_status
+        - user
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        company_name:
+          type: string
+        verification_status:
+          type: string
+          enum: [PENDING, VERIFIED, REJECTED]
+        user:
+          $ref: '#/components/schemas/AdminBusinessUser'
+    AdminBusinessesListResponse:
+      type: object
+      required:
+        - businesses
+        - pagination
+        - total
+        - page
+        - limit
+        - totalPages
+      properties:
+        businesses:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminBusinessDetails'
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalPages:
+          type: integer
+    VerifyBusinessRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [VERIFIED, REJECTED]
+          description: Verification decision
+        verification_status:
+          type: string
+          enum: [VERIFIED, REJECTED]
+          description: Optional alias for status
+        decision:
+          type: string
+          enum: [VERIFIED, REJECTED]
+          description: Optional alias for status
+    VerifyBusinessResponse:
+      type: object
+      required:
+        - message
+        - business
+      properties:
+        message:
+          type: string
+        business:
+          $ref: '#/components/schemas/AdminBusinessDetails'
