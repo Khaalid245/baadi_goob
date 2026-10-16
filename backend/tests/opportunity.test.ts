@@ -670,7 +670,9 @@ describe("Opportunity Module HTTP Endpoints (Integration)", () => {
 
   describe("GET /api/v1/opportunities - Expired & Closed Opportunities Handling", () => {
     it("should include expired and closed opportunities by default and clearly identify status", async () => {
-      const res = await request(app).get("/api/v1/opportunities");
+      const res = await request(app)
+        .get("/api/v1/opportunities")
+        .query({ limit: 50 });
 
       expect(res.status).toBe(200);
 
