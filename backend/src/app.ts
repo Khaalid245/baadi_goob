@@ -12,6 +12,7 @@ import { authRouter } from "./routes/auth.routes";
 import { studentRouter } from "./routes/student.routes";
 import { businessRouter } from "./routes/business.routes";
 import { opportunityRouter } from "./routes/opportunity.routes";
+import { applicationRouter } from "./routes/application.routes";
 
 export const app = express();
 
@@ -40,6 +41,9 @@ app.use("/api/v1/businesses", businessRouter);
 
 // Opportunity routes
 app.use("/api/v1/opportunities", opportunityRouter);
+
+// Application routes
+app.use("/api/v1/applications", applicationRouter);
 
 // Swagger API Documentation
 const swaggerPath = path.resolve(__dirname, "../../docs/openapi.yaml");

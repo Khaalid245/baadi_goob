@@ -465,26 +465,171 @@ paths:
   /opportunities/{id}/applications:
     post:
       summary: Apply to opportunity
+      description: Submits an application for the authenticated student using their saved profile. Requires a complete student profile with at least one skill. Only eligible for OPEN internship and job opportunities whose deadline has not passed. Prevents duplicate applications.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Opportunity unique identifier
       responses:
         '201':
-          description: Created
+          description: Application submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplyOpportunityResponse'
+        '400':
+          description: Invalid opportunity ID, opportunity closed, deadline passed, or competition type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (Access denied, account suspended, or incomplete student profile)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Opportunity not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict (Already applied to this opportunity)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     get:
-      summary: Get applications for opportunity
+      summary: Get applicants for opportunity
+      description: Returns a list of applicants for the specified opportunity. Accessible only by the business that posted the opportunity (FR-009). Returns student profile information (name, email, education, skills, project links) and application details (id, status, submitted_at).
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Opportunity unique identifier
       responses:
         '200':
-          description: OK
+          description: List of applicants for the opportunity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpportunityApplicationsResponse'
+        '400':
+          description: Invalid opportunity ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (Access denied, not the owner business, or role is not business)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Opportunity not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /students/me/applications:
     get:
-      summary: Get my applications
+      summary: Get student applications
+      description: Returns a list of all applications submitted by the authenticated student, ordered newest first. Includes related opportunity information (id, title, type, deadline, status, and company_name). Returns an empty array if the student has no applications.
+      security:
+        - bearerAuth: []
       responses:
         '200':
-          description: OK
+          description: List of applications submitted by the authenticated student
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentApplicationsResponse'
+        '401':
+          description: Authentication required or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (Access denied or account suspended)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /applications/{id}/status:
     patch:
       summary: Update application status
+      description: Allows a business to update the status of an applicant for an opportunity they own (FR-010). Permitted target statuses are SHORTLISTED, REJECTED, and HIRED (NEW is rejected). Atomically creates a notification for the student in the database (FR-014).
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Application unique identifier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateApplicationStatusRequest'
       responses:
         '200':
-          description: OK
+          description: Application status updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateApplicationStatusResponse'
+        '400':
+          description: Invalid application ID, invalid or unsupported status (including NEW), or unrecognized fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (Access denied, not the owner business, or role is not business)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Application not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /opportunities/{id}/registrations:
     post:
       summary: Register for competition
@@ -816,3 +961,174 @@ components:
           type: string
         opportunity:
           $ref: '#/components/schemas/Opportunity'
+    Application:
+      type: object
+      required:
+        - id
+        - student_id
+        - opportunity_id
+        - status
+        - submitted_at
+      properties:
+        id:
+          type: string
+        student_id:
+          type: string
+        opportunity_id:
+          type: string
+        status:
+          type: string
+          enum: [NEW, SHORTLISTED, REJECTED, HIRED]
+        submitted_at:
+          type: string
+          format: date-time
+    ApplyOpportunityResponse:
+      type: object
+      required:
+        - message
+        - application
+      properties:
+        message:
+          type: string
+        application:
+          $ref: '#/components/schemas/Application'
+    StudentApplicationOpportunity:
+      type: object
+      required:
+        - id
+        - title
+        - type
+        - deadline
+        - status
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        type:
+          type: string
+          enum: [INTERNSHIP, JOB, COMPETITION]
+        deadline:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [OPEN, CLOSED]
+        company_name:
+          type: string
+          nullable: true
+    StudentApplicationItem:
+      type: object
+      required:
+        - id
+        - student_id
+        - opportunity_id
+        - status
+        - submitted_at
+        - opportunity
+      properties:
+        id:
+          type: string
+        student_id:
+          type: string
+        opportunity_id:
+          type: string
+        status:
+          type: string
+          enum: [NEW, SHORTLISTED, REJECTED, HIRED]
+        submitted_at:
+          type: string
+          format: date-time
+        opportunity:
+          $ref: '#/components/schemas/StudentApplicationOpportunity'
+          nullable: true
+    StudentApplicationsResponse:
+      type: object
+      required:
+        - applications
+      properties:
+        applications:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudentApplicationItem'
+    OpportunityApplicantItem:
+      type: object
+      required:
+        - id
+        - student_id
+        - name
+        - email
+        - status
+        - submitted_at
+      properties:
+        id:
+          type: string
+          description: Application ID
+        student_id:
+          type: string
+          description: Student User ID
+        name:
+          type: string
+          description: Student name
+        email:
+          type: string
+          format: email
+          description: Student email
+        education:
+          type: string
+          nullable: true
+          description: Student education from profile
+        skills:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: Student skills from profile
+        project_links:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: Student project links from profile
+        status:
+          type: string
+          enum: [NEW, SHORTLISTED, REJECTED, HIRED]
+          description: Application status
+        submitted_at:
+          type: string
+          format: date-time
+          description: Application submission timestamp
+    OpportunityApplicationsResponse:
+      type: object
+      required:
+        - applications
+      properties:
+        applications:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpportunityApplicantItem'
+        applicants:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpportunityApplicantItem'
+    UpdateApplicationStatusRequest:
+      type: object
+      required:
+        - status
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum: [SHORTLISTED, REJECTED, HIRED]
+          description: New status for the application. Setting NEW is rejected with 400.
+    UpdateApplicationStatusResponse:
+      type: object
+      required:
+        - message
+        - application
+      properties:
+        message:
+          type: string
+          example: Application status updated successfully
+        application:
+          $ref: '#/components/schemas/Application'
