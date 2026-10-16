@@ -1,4 +1,5 @@
 import {
+  Prisma,
   Role,
   UserStatus,
   VerificationStatus,
@@ -7,7 +8,10 @@ import {
 } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { AppError } from "../middleware/errorHandler";
-import { ListBusinessesQuery } from "../validations/admin.validation";
+import {
+  ListBusinessesQuery,
+  ListUsersQuery,
+} from "../validations/admin.validation";
 
 export interface SafeBusinessUser {
   id: string;
@@ -219,4 +223,152 @@ export const verifyBusiness = async (
 
     return formatBusinessDetails(updatedProfile);
   });
+};
+
+export interface SafeAdminUser {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  status: UserStatus;
+  created_at: string;
+}
+
+export interface ListUsersResult {
+  users: SafeAdminUser[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  };
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+/**
+ * Lists user accounts filtered by role and status (FR-021).
+ * Accessible to Administrators only.
+ * Supports deterministic ordering and pagination.
+ * Excludes sensitive fields (passwords, tokens).
+ */
+export const listUsers = async (
+  query: ListUsersQuery
+): Promise<ListUsersResult> => {
+  const page = query.page ?? 1;
+  const limit = query.limit ?? 10;
+  const skip = (page - 1) * limit;
+
+  const where: Prisma.UserWhereInput = {};
+  if (query.role) {
+    where.role = query.role;
+  }
+  if (query.status) {
+    where.status = query.status;
+  }
+
+  const [total, users] = await Promise.all([
+    prisma.user.count({ where }),
+    prisma.user.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: [{ created_at: "desc" }, { id: "asc" }],
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        status: true,
+        created_at: true,
+      },
+    }),
+  ]);
+
+  const totalPages = Math.ceil(total / limit) || (total === 0 ? 0 : 1);
+  const hasNextPage = page < totalPages;
+  const hasPrevPage = page > 1;
+
+  return {
+    users: users.map((u) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      status: u.status,
+      created_at: u.created_at.toISOString(),
+    })),
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages,
+      hasNextPage,
+      hasPrevPage,
+    },
+    total,
+    page,
+    limit,
+    totalPages,
+  };
+};
+
+/**
+ * Updates a user account status (suspends or reactivates) (FR-021).
+ * Accessible to Administrators only.
+ * Prevents self-suspension by the calling administrator and rejects redundant transitions.
+ */
+export const updateUserStatus = async (
+  targetUserId: string,
+  targetStatus: UserStatus,
+  adminUserId: string
+): Promise<SafeAdminUser> => {
+  // 1. Prevent self-suspension
+  if (targetUserId === adminUserId && targetStatus === UserStatus.SUSPENDED) {
+    throw new AppError("Administrators cannot suspend their own account", 400);
+  }
+
+  // 2. Fetch existing user
+  const user = await prisma.user.findUnique({
+    where: { id: targetUserId },
+  });
+
+  if (!user) {
+    throw new AppError("User not found", 404);
+  }
+
+  // 3. Prevent redundant status transition
+  if (user.status === targetStatus) {
+    throw new AppError(
+      `User is already ${targetStatus.toLowerCase()}`,
+      400
+    );
+  }
+
+  // 4. Update status
+  const updated = await prisma.user.update({
+    where: { id: targetUserId },
+    data: { status: targetStatus },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      status: true,
+      created_at: true,
+    },
+  });
+
+  return {
+    id: updated.id,
+    name: updated.name,
+    email: updated.email,
+    role: updated.role,
+    status: updated.status,
+    created_at: updated.created_at.toISOString(),
+  };
 };
