@@ -11,6 +11,10 @@ import {
   closeOpportunity,
   deleteOpportunity,
 } from "../controllers/opportunity.controller";
+import {
+  postApplication,
+  getOpportunityApplications,
+} from "../controllers/application.controller";
 
 export const opportunityRouter = Router();
 
@@ -40,4 +44,16 @@ opportunityRouter.delete(
   authenticate,
   roleCheck([Role.BUSINESS, Role.ADMIN]),
   deleteOpportunity
+);
+opportunityRouter.post(
+  "/:id/applications",
+  authenticate,
+  roleCheck([Role.STUDENT]),
+  postApplication
+);
+opportunityRouter.get(
+  "/:id/applications",
+  authenticate,
+  roleCheck([Role.BUSINESS]),
+  getOpportunityApplications
 );
