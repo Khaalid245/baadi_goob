@@ -1003,10 +1003,29 @@ paths:
           description: No content
   /dashboard/summary:
     get:
-      summary: Get dashboard summary
+      summary: Get role-based dashboard summary (FR-022)
+      description: Returns summary counts and key metrics tailored to the authenticated user's role (STUDENT, BUSINESS, or ADMIN). Identity and role are derived strictly from the authenticated JWT token. Suspended accounts are rejected with 403.
+      security:
+        - bearerAuth: []
       responses:
         '200':
-          description: OK
+          description: Role-specific dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSummaryResponse'
+        '401':
+          description: Authentication required or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (Account suspended)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /health:
     get:
       summary: Health check
@@ -1750,3 +1769,244 @@ components:
         message:
           type: string
           example: If that email is registered, a password reset link has been sent.
+    StudentDashboardSummary:
+      type: object
+      required:
+        - role
+        - applications
+        - total_applications
+        - competition_registrations
+        - profile_complete
+      properties:
+        role:
+          type: string
+          enum: [STUDENT]
+        applications:
+          type: object
+          required:
+            - NEW
+            - SHORTLISTED
+            - REJECTED
+            - HIRED
+            - total
+          properties:
+            NEW:
+              type: integer
+              example: 2
+            SHORTLISTED:
+              type: integer
+              example: 1
+            REJECTED:
+              type: integer
+              example: 0
+            HIRED:
+              type: integer
+              example: 0
+            total:
+              type: integer
+              example: 3
+        applications_by_status:
+          type: object
+          properties:
+            NEW:
+              type: integer
+            SHORTLISTED:
+              type: integer
+            REJECTED:
+              type: integer
+            HIRED:
+              type: integer
+        total_applications:
+          type: integer
+          example: 3
+        competition_registrations:
+          type: integer
+          example: 1
+        total_competition_registrations:
+          type: integer
+          example: 1
+        profile_complete:
+          type: boolean
+          example: true
+        is_profile_complete:
+          type: boolean
+          example: true
+    BusinessDashboardSummary:
+      type: object
+      required:
+        - role
+        - verification_status
+        - opportunities
+        - total_opportunities
+        - active_opportunities
+        - applications
+        - total_applications
+        - pending_applications
+        - competition_registrations
+      properties:
+        role:
+          type: string
+          enum: [BUSINESS]
+        verification_status:
+          type: string
+          enum: [PENDING, VERIFIED, REJECTED]
+        opportunities:
+          type: object
+          required:
+            - OPEN
+            - CLOSED
+            - total
+          properties:
+            OPEN:
+              type: integer
+              example: 4
+            CLOSED:
+              type: integer
+              example: 1
+            total:
+              type: integer
+              example: 5
+        opportunities_by_status:
+          type: object
+          properties:
+            OPEN:
+              type: integer
+            CLOSED:
+              type: integer
+        total_opportunities:
+          type: integer
+          example: 5
+        active_opportunities:
+          type: integer
+          example: 4
+        applications:
+          type: object
+          required:
+            - NEW
+            - SHORTLISTED
+            - REJECTED
+            - HIRED
+            - total
+          properties:
+            NEW:
+              type: integer
+              example: 3
+            SHORTLISTED:
+              type: integer
+              example: 2
+            REJECTED:
+              type: integer
+              example: 1
+            HIRED:
+              type: integer
+              example: 1
+            total:
+              type: integer
+              example: 7
+        applications_by_status:
+          type: object
+          properties:
+            NEW:
+              type: integer
+            SHORTLISTED:
+              type: integer
+            REJECTED:
+              type: integer
+            HIRED:
+              type: integer
+        total_applications:
+          type: integer
+          example: 7
+        pending_applications:
+          type: integer
+          example: 3
+        competition_registrations:
+          type: integer
+          example: 2
+        total_competition_registrations:
+          type: integer
+          example: 2
+    AdminDashboardSummary:
+      type: object
+      required:
+        - role
+        - users
+        - total_users
+        - businesses_awaiting_verification
+        - pending_verifications
+        - opportunities
+        - total_opportunities
+        - active_opportunities
+        - total_applications
+      properties:
+        role:
+          type: string
+          enum: [ADMIN]
+        users:
+          type: object
+          required:
+            - STUDENT
+            - BUSINESS
+            - ADMIN
+            - total
+          properties:
+            STUDENT:
+              type: integer
+              example: 25
+            BUSINESS:
+              type: integer
+              example: 10
+            ADMIN:
+              type: integer
+              example: 2
+            total:
+              type: integer
+              example: 37
+        users_by_role:
+          type: object
+          properties:
+            STUDENT:
+              type: integer
+            BUSINESS:
+              type: integer
+            ADMIN:
+              type: integer
+        total_users:
+          type: integer
+          example: 37
+        businesses_awaiting_verification:
+          type: integer
+          example: 3
+        pending_verifications:
+          type: integer
+          example: 3
+        opportunities:
+          type: object
+          required:
+            - OPEN
+            - CLOSED
+            - total
+          properties:
+            OPEN:
+              type: integer
+              example: 15
+            CLOSED:
+              type: integer
+              example: 3
+            total:
+              type: integer
+              example: 18
+        total_opportunities:
+          type: integer
+          example: 18
+        active_opportunities:
+          type: integer
+          example: 15
+        total_applications:
+          type: integer
+          example: 42
+    DashboardSummaryResponse:
+      oneOf:
+        - $ref: '#/components/schemas/StudentDashboardSummary'
+        - $ref: '#/components/schemas/BusinessDashboardSummary'
+        - $ref: '#/components/schemas/AdminDashboardSummary'
