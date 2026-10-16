@@ -15,6 +15,10 @@ import {
   postApplication,
   getOpportunityApplications,
 } from "../controllers/application.controller";
+import {
+  postRegistration,
+  getOpportunityRegistrations,
+} from "../controllers/registration.controller";
 
 export const opportunityRouter = Router();
 
@@ -56,4 +60,16 @@ opportunityRouter.get(
   authenticate,
   roleCheck([Role.BUSINESS]),
   getOpportunityApplications
+);
+opportunityRouter.post(
+  "/:id/registrations",
+  authenticate,
+  roleCheck([Role.STUDENT]),
+  postRegistration
+);
+opportunityRouter.get(
+  "/:id/registrations",
+  authenticate,
+  roleCheck([Role.BUSINESS, Role.ADMIN]),
+  getOpportunityRegistrations
 );

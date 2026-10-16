@@ -555,6 +555,99 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /opportunities/{id}/registrations:
+    post:
+      summary: Register for competition
+      description: Allows an authenticated student to register for a listed competition (FR-006). Only eligible for OPEN competition opportunities whose deadline has not passed. Prevents duplicate registrations.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Competition opportunity unique identifier
+      responses:
+        '201':
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterCompetitionResponse'
+        '400':
+          description: Invalid opportunity ID, opportunity closed, deadline passed, or opportunity is not a competition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (Access denied or role is not student)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Opportunity not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict (Already registered for this competition)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      summary: Get competition registrants
+      description: Returns a list of students registered for the specified competition opportunity (FR-018). Accessible by the business that posted the competition or platform administrators (Section 5). Returns student profile information (name, email, education, skills, project links) and registration details (id, student_id, registered_at).
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Competition opportunity unique identifier
+      responses:
+        '200':
+          description: List of students registered for the competition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompetitionRegistrationsResponse'
+        '400':
+          description: Invalid opportunity ID or opportunity is not a competition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (Access denied, not the owner business, or role is student)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Opportunity not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /students/me/applications:
     get:
       summary: Get student applications
@@ -1132,3 +1225,84 @@ components:
           example: Application status updated successfully
         application:
           $ref: '#/components/schemas/Application'
+    CompetitionRegistration:
+      type: object
+      required:
+        - id
+        - student_id
+        - opportunity_id
+        - registered_at
+      properties:
+        id:
+          type: string
+          description: Registration unique identifier
+        student_id:
+          type: string
+          description: ID of the registered student
+        opportunity_id:
+          type: string
+          description: ID of the competition opportunity
+        registered_at:
+          type: string
+          format: date-time
+          description: Timestamp when the registration was created
+    RegisterCompetitionResponse:
+      type: object
+      required:
+        - message
+        - registration
+      properties:
+        message:
+          type: string
+          example: Registration successful
+        registration:
+          $ref: '#/components/schemas/CompetitionRegistration'
+    CompetitionRegistrantItem:
+      type: object
+      required:
+        - id
+        - student_id
+        - registered_at
+        - name
+        - email
+      properties:
+        id:
+          type: string
+          description: Registration unique identifier
+        student_id:
+          type: string
+          description: ID of the registered student
+        registered_at:
+          type: string
+          format: date-time
+          description: Registration timestamp
+        name:
+          type: string
+          description: Student full name
+        email:
+          type: string
+          format: email
+          description: Student email address
+        education:
+          type: string
+          nullable: true
+          description: Student education summary
+        skills:
+          nullable: true
+          description: Student skills array or JSON
+        project_links:
+          nullable: true
+          description: Student project links array or JSON
+    CompetitionRegistrationsResponse:
+      type: object
+      required:
+        - registrations
+      properties:
+        registrations:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompetitionRegistrantItem'
+        registrants:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompetitionRegistrantItem'
