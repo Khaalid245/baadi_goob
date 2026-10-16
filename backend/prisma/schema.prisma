@@ -17,6 +17,7 @@ enum Role {
 enum UserStatus {
   ACTIVE
   SUSPENDED
+  DELETED
 }
 
 enum VerificationStatus {
@@ -51,6 +52,7 @@ model User {
   password_hash String
   status        UserStatus @default(ACTIVE)
   created_at    DateTime  @default(now())
+  deleted_at    DateTime?
 
   studentProfile  StudentProfile?
   businessProfile BusinessProfile?

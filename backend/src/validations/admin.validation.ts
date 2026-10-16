@@ -117,7 +117,7 @@ export const listUsersQuerySchema = z
       .preprocess(
         (val) => (typeof val === "string" ? val.toUpperCase() : val),
         z.nativeEnum(UserStatus, {
-          message: "Status must be one of: ACTIVE, SUSPENDED",
+          message: "Status must be one of: ACTIVE, SUSPENDED, DELETED",
         })
       )
       .optional(),
@@ -170,7 +170,7 @@ export const updateUserStatusBodySchema = z
   .object({
     status: z.preprocess(
       (val) => (typeof val === "string" ? val.toUpperCase() : val),
-      z.nativeEnum(UserStatus, {
+      z.enum(["ACTIVE", "SUSPENDED"], {
         message: "Status must be one of: ACTIVE, SUSPENDED",
       })
     ),

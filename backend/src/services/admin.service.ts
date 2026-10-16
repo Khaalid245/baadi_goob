@@ -341,7 +341,12 @@ export const updateUserStatus = async (
     throw new AppError("User not found", 404);
   }
 
-  // 3. Prevent redundant status transition
+  // 3. Prevent modifying deleted accounts
+  if (user.status === UserStatus.DELETED) {
+    throw new AppError("Cannot modify status of a deleted account", 400);
+  }
+
+  // 4. Prevent redundant status transition
   if (user.status === targetStatus) {
     throw new AppError(
       `User is already ${targetStatus.toLowerCase()}`,
