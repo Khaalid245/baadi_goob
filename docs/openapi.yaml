@@ -31,16 +31,62 @@ paths:
           description: OK
   /auth/password-reset:
     post:
-      summary: Request password reset
+      summary: Request password reset (FR-017)
+      description: Initiates a single-use password reset workflow. Returns an identical generic success response whether or not the email exists to prevent account enumeration. A cryptographically secure random token is generated and its SHA-256 hash is persisted with a 15-minute expiration. Rate-limited to 5 requests per 15-minute window per IP in production.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetRequest'
       responses:
         '200':
-          description: OK
+          description: Generic password reset response (anti-enumeration)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasswordResetResponse'
+        '400':
+          description: Invalid request body or email format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many password reset attempts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /auth/password-reset/confirm:
     post:
-      summary: Confirm password reset
+      summary: Confirm password reset (FR-017)
+      description: Completes password reset by validating the supplied token against its stored SHA-256 hash. Rejects invalid, expired, or previously used tokens. Atomically invalidates the token and updates the user's password with a salted bcrypt hash. Suspended accounts are rejected with 403.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetConfirmRequest'
       responses:
         '200':
-          description: OK
+          description: Password reset successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasswordResetResponse'
+        '400':
+          description: Invalid or expired reset token, or invalid password format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Account is suspended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /students/me/profile:
     get:
       summary: Get student profile
@@ -1669,3 +1715,38 @@ components:
           type: string
         user:
           $ref: '#/components/schemas/AdminUser'
+    PasswordResetRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+          description: Registered account email address
+    PasswordResetConfirmRequest:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+          description: Single-use password reset token received via email
+        newPassword:
+          type: string
+          minLength: 8
+          description: New password (must be at least 8 characters)
+        password:
+          type: string
+          minLength: 8
+          description: Alternative field for new password
+    PasswordResetResponse:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          example: If that email is registered, a password reset link has been sent.

@@ -1,9 +1,14 @@
+import crypto from "crypto";
 import request from "supertest";
 import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { app } from "../src/app";
 import { prisma } from "../src/lib/prisma";
 import { verifyToken } from "../src/common/jwt";
+import {
+  hashResetToken,
+  PASSWORD_RESET_GENERIC_MESSAGE,
+} from "../src/services/auth.service";
 
 describe("POST /api/v1/auth/register", () => {
   const runId = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -563,6 +568,572 @@ describe("POST /api/v1/auth/login", () => {
 
     it("should return 400 when request body is empty", async () => {
       const res = await request(app).post("/api/v1/auth/login").send({});
+
+      expect(res.status).toBe(400);
+      expect(res.body).toHaveProperty("error");
+    });
+  });
+});
+
+describe("POST /api/v1/auth/password-reset", () => {
+  const resetRunId = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const resetEmails = new Set<string>();
+
+  const generateResetEmail = (prefix: string): string => {
+    const email = `${prefix}_${resetRunId}_${Math.random().toString(36).slice(2, 6)}@test.local`.toLowerCase();
+    resetEmails.add(email);
+    return email;
+  };
+
+  afterAll(async () => {
+    if (resetEmails.size > 0) {
+      await prisma.user.deleteMany({
+        where: {
+          email: { in: Array.from(resetEmails) },
+        },
+      });
+    }
+  });
+
+  describe("Anti-Enumeration & Generic Response", () => {
+    it("should return identical generic 200 response for an existing user without leaking account existence", async () => {
+      const email = generateResetEmail("existing_reset");
+      const password = "InitialPassword123!";
+
+      await request(app).post("/api/v1/auth/register").send({
+        name: "Existing User",
+        email,
+        password,
+      });
+
+      const res = await request(app)
+        .post("/api/v1/auth/password-reset")
+        .send({ email });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        message: PASSWORD_RESET_GENERIC_MESSAGE,
+      });
+
+      // Verify no sensitive fields in response
+      expect(res.body.token).toBeUndefined();
+      expect(res.body.rawToken).toBeUndefined();
+      expect(res.body.token_hash).toBeUndefined();
+      expect(res.body.password).toBeUndefined();
+      expect(res.body.user).toBeUndefined();
+    });
+
+    it("should return identical generic 200 response for a nonexistent user", async () => {
+      const nonexistentEmail = generateResetEmail("nonexistent_reset");
+
+      const res = await request(app)
+        .post("/api/v1/auth/password-reset")
+        .send({ email: nonexistentEmail });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        message: PASSWORD_RESET_GENERIC_MESSAGE,
+      });
+
+      expect(res.body.token).toBeUndefined();
+      expect(res.body.user).toBeUndefined();
+    });
+
+    it("should return identical generic 200 response for a suspended user without issuing an active token", async () => {
+      const email = generateResetEmail("suspended_reset");
+      const password = "InitialPassword123!";
+
+      const regRes = await request(app).post("/api/v1/auth/register").send({
+        name: "Suspended User",
+        email,
+        password,
+      });
+      expect(regRes.status).toBe(201);
+
+      await prisma.user.update({
+        where: { email },
+        data: { status: "SUSPENDED" },
+      });
+
+      const res = await request(app)
+        .post("/api/v1/auth/password-reset")
+        .send({ email });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        message: PASSWORD_RESET_GENERIC_MESSAGE,
+      });
+
+      // Confirm no active reset token was created for the suspended account
+      const tokens = await prisma.passwordResetToken.findMany({
+        where: { user: { email } },
+      });
+      expect(tokens.length).toBe(0);
+    });
+
+    it("should trim and normalize email casing", async () => {
+      const email = generateResetEmail("cased_reset");
+      const password = "InitialPassword123!";
+
+      await request(app).post("/api/v1/auth/register").send({
+        name: "Cased User",
+        email,
+        password,
+      });
+
+      const res = await request(app)
+        .post("/api/v1/auth/password-reset")
+        .send({ email: `  ${email.toUpperCase()}  ` });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        message: PASSWORD_RESET_GENERIC_MESSAGE,
+      });
+
+      // Verify token was created for normalized user
+      const dbToken = await prisma.passwordResetToken.findFirst({
+        where: { user: { email: email.toLowerCase() } },
+      });
+      expect(dbToken).not.toBeNull();
+    });
+  });
+
+  describe("Token Persistence & Storage Security", () => {
+    it("should persist a SHA-256 hashed token with 15-minute expiration and null used_at", async () => {
+      const email = generateResetEmail("token_persist");
+      const password = "Password123!";
+
+      const regRes = await request(app).post("/api/v1/auth/register").send({
+        name: "Token Persist User",
+        email,
+        password,
+      });
+      const userId = regRes.body.user.id;
+
+      const beforeTime = Date.now();
+      const res = await request(app)
+        .post("/api/v1/auth/password-reset")
+        .send({ email });
+
+      expect(res.status).toBe(200);
+
+      const tokenRecord = await prisma.passwordResetToken.findFirst({
+        where: { user_id: userId },
+      });
+
+      expect(tokenRecord).not.toBeNull();
+      expect(tokenRecord?.user_id).toBe(userId);
+      expect(tokenRecord?.token_hash).toMatch(/^[a-f0-9]{64}$/);
+      expect(tokenRecord?.used_at).toBeNull();
+
+      const expiresAt = tokenRecord!.expires_at.getTime();
+      expect(expiresAt).toBeGreaterThan(beforeTime + 14 * 60 * 1000);
+      expect(expiresAt).toBeLessThanOrEqual(beforeTime + 16 * 60 * 1000);
+    });
+
+    it("should supersede previous unused reset tokens upon repeated requests", async () => {
+      const email = generateResetEmail("repeated_requests");
+      const password = "Password123!";
+
+      const regRes = await request(app).post("/api/v1/auth/register").send({
+        name: "Repeat User",
+        email,
+        password,
+      });
+      const userId = regRes.body.user.id;
+
+      // First request
+      await request(app).post("/api/v1/auth/password-reset").send({ email });
+
+      const firstToken = await prisma.passwordResetToken.findFirst({
+        where: { user_id: userId },
+        orderBy: { created_at: "desc" },
+      });
+      expect(firstToken).not.toBeNull();
+      expect(firstToken?.used_at).toBeNull();
+
+      // Second request
+      await request(app).post("/api/v1/auth/password-reset").send({ email });
+
+      // First token must now be marked as used (superseded)
+      const updatedFirstToken = await prisma.passwordResetToken.findUnique({
+        where: { id: firstToken!.id },
+      });
+      expect(updatedFirstToken?.used_at).not.toBeNull();
+
+      // Exactly one token for this user should now be active (used_at === null)
+      const activeTokens = await prisma.passwordResetToken.findMany({
+        where: { user_id: userId, used_at: null },
+      });
+      expect(activeTokens.length).toBe(1);
+      expect(activeTokens[0].id).not.toBe(firstToken!.id);
+    });
+  });
+
+  describe("Validation Errors (400 Bad Request)", () => {
+    it("should return 400 when email is missing", async () => {
+      const res = await request(app)
+        .post("/api/v1/auth/password-reset")
+        .send({});
+
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({ error: "Email is required" });
+    });
+
+    it("should return 400 when email format is invalid", async () => {
+      const res = await request(app)
+        .post("/api/v1/auth/password-reset")
+        .send({ email: "not-an-email" });
+
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({ error: "Invalid email address" });
+    });
+  });
+});
+
+describe("POST /api/v1/auth/password-reset/confirm", () => {
+  const confirmRunId = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const confirmEmails = new Set<string>();
+
+  const generateConfirmEmail = (prefix: string): string => {
+    const email = `${prefix}_${confirmRunId}_${Math.random().toString(36).slice(2, 6)}@test.local`.toLowerCase();
+    confirmEmails.add(email);
+    return email;
+  };
+
+  afterAll(async () => {
+    if (confirmEmails.size > 0) {
+      await prisma.user.deleteMany({
+        where: {
+          email: { in: Array.from(confirmEmails) },
+        },
+      });
+    }
+  });
+
+  const createTokenFixture = async (
+    userId: string,
+    options?: {
+      expiresAt?: Date;
+      usedAt?: Date;
+    }
+  ): Promise<{ rawToken: string; tokenRecordId: string }> => {
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const token_hash = hashResetToken(rawToken);
+    const expires_at =
+      options?.expiresAt ?? new Date(Date.now() + 15 * 60 * 1000);
+
+    const record = await prisma.passwordResetToken.create({
+      data: {
+        user_id: userId,
+        token_hash,
+        expires_at,
+        used_at: options?.usedAt,
+      },
+    });
+
+    return { rawToken, tokenRecordId: record.id };
+  };
+
+  describe("Successful Confirmation & Password Lifecycle", () => {
+    it("should confirm password reset with newPassword, update password_hash, invalidate token, and allow login", async () => {
+      const email = generateConfirmEmail("success_confirm");
+      const oldPassword = "OldPassword123!";
+      const newPassword = "NewPassword123!";
+
+      const regRes = await request(app).post("/api/v1/auth/register").send({
+        name: "Success Confirm User",
+        email,
+        password: oldPassword,
+      });
+      const userId = regRes.body.user.id;
+
+      const { rawToken, tokenRecordId } = await createTokenFixture(userId);
+
+      const confirmRes = await request(app)
+        .post("/api/v1/auth/password-reset/confirm")
+        .send({
+          token: rawToken,
+          newPassword,
+        });
+
+      expect(confirmRes.status).toBe(200);
+      expect(confirmRes.body).toEqual({
+        message: "Password has been reset successfully",
+      });
+
+      // Verify no sensitive fields in response
+      expect(confirmRes.body.token).toBeUndefined();
+      expect(confirmRes.body.password).toBeUndefined();
+      expect(confirmRes.body.password_hash).toBeUndefined();
+      expect(confirmRes.body.user).toBeUndefined();
+
+      // Verify token is now marked as used in database
+      const updatedToken = await prisma.passwordResetToken.findUnique({
+        where: { id: tokenRecordId },
+      });
+      expect(updatedToken?.used_at).not.toBeNull();
+
+      // Verify user password_hash in database updated
+      const updatedUser = await prisma.user.findUnique({
+        where: { id: userId },
+      });
+      expect(await bcrypt.compare(newPassword, updatedUser!.password_hash)).toBe(true);
+      expect(await bcrypt.compare(oldPassword, updatedUser!.password_hash)).toBe(false);
+
+      // Verify old password cannot log in
+      const oldLoginRes = await request(app).post("/api/v1/auth/login").send({
+        email,
+        password: oldPassword,
+      });
+      expect(oldLoginRes.status).toBe(401);
+      expect(oldLoginRes.body).toEqual({ error: "Invalid email or password" });
+
+      // Verify new password successfully logs in
+      const newLoginRes = await request(app).post("/api/v1/auth/login").send({
+        email,
+        password: newPassword,
+      });
+      expect(newLoginRes.status).toBe(200);
+      expect(newLoginRes.body).toHaveProperty("token");
+      expect(newLoginRes.body.user.email).toBe(email);
+    });
+
+    it("should accept 'password' as alternative field name for newPassword", async () => {
+      const email = generateConfirmEmail("alt_field_confirm");
+      const oldPassword = "OldPassword123!";
+      const newPassword = "AltPassword123!";
+
+      const regRes = await request(app).post("/api/v1/auth/register").send({
+        name: "Alt Field User",
+        email,
+        password: oldPassword,
+      });
+      const userId = regRes.body.user.id;
+
+      const { rawToken } = await createTokenFixture(userId);
+
+      const confirmRes = await request(app)
+        .post("/api/v1/auth/password-reset/confirm")
+        .send({
+          token: rawToken,
+          password: newPassword,
+        });
+
+      expect(confirmRes.status).toBe(200);
+      expect(confirmRes.body).toEqual({
+        message: "Password has been reset successfully",
+      });
+
+      // Verify login with new password
+      const loginRes = await request(app).post("/api/v1/auth/login").send({
+        email,
+        password: newPassword,
+      });
+      expect(loginRes.status).toBe(200);
+    });
+  });
+
+  describe("Token Invalidation, Expiry & Single-Use Enforcement", () => {
+    it("should reject token reuse (single-use enforcement) with HTTP 400", async () => {
+      const email = generateConfirmEmail("reuse_token");
+      const oldPassword = "OldPassword123!";
+      const newPassword = "FirstNewPassword123!";
+
+      const regRes = await request(app).post("/api/v1/auth/register").send({
+        name: "Reuse User",
+        email,
+        password: oldPassword,
+      });
+      const userId = regRes.body.user.id;
+
+      const { rawToken } = await createTokenFixture(userId);
+
+      // First confirmation succeeds
+      const firstRes = await request(app)
+        .post("/api/v1/auth/password-reset/confirm")
+        .send({
+          token: rawToken,
+          newPassword,
+        });
+      expect(firstRes.status).toBe(200);
+
+      // Reusing the same token must fail with 400
+      const secondRes = await request(app)
+        .post("/api/v1/auth/password-reset/confirm")
+        .send({
+          token: rawToken,
+          newPassword: "SecondNewPassword123!",
+        });
+
+      expect(secondRes.status).toBe(400);
+      expect(secondRes.body).toEqual({
+        error: "Invalid or expired reset token",
+      });
+    });
+
+    it("should reject expired tokens with HTTP 400", async () => {
+      const email = generateConfirmEmail("expired_token");
+      const password = "OldPassword123!";
+
+      const regRes = await request(app).post("/api/v1/auth/register").send({
+        name: "Expired User",
+        email,
+        password,
+      });
+      const userId = regRes.body.user.id;
+
+      // Token that expired 5 minutes ago
+      const expiredDate = new Date(Date.now() - 5 * 60 * 1000);
+      const { rawToken } = await createTokenFixture(userId, { expiresAt: expiredDate });
+
+      const res = await request(app)
+        .post("/api/v1/auth/password-reset/confirm")
+        .send({
+          token: rawToken,
+          newPassword: "NewPassword123!",
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({
+        error: "Invalid or expired reset token",
+      });
+    });
+
+    it("should reject invalid/unrecognized tokens with HTTP 400", async () => {
+      const res = await request(app)
+        .post("/api/v1/auth/password-reset/confirm")
+        .send({
+          token: "f".repeat(64),
+          newPassword: "NewPassword123!",
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({
+        error: "Invalid or expired reset token",
+      });
+    });
+
+    it("should handle concurrent confirmation attempts safely where only one succeeds", async () => {
+      const email = generateConfirmEmail("concurrent_confirm");
+      const password = "Password123!";
+
+      const regRes = await request(app).post("/api/v1/auth/register").send({
+        name: "Concurrent User",
+        email,
+        password,
+      });
+      const userId = regRes.body.user.id;
+
+      const { rawToken } = await createTokenFixture(userId);
+
+      // Fire 2 concurrent requests with the exact same token
+      const [res1, res2] = await Promise.all([
+        request(app)
+          .post("/api/v1/auth/password-reset/confirm")
+          .send({ token: rawToken, newPassword: "ConcurrentPasswordA123!" }),
+        request(app)
+          .post("/api/v1/auth/password-reset/confirm")
+          .send({ token: rawToken, newPassword: "ConcurrentPasswordB123!" }),
+      ]);
+
+      const statuses = [res1.status, res2.status].sort();
+      expect(statuses).toEqual([200, 400]);
+
+      const failedRes = res1.status === 400 ? res1 : res2;
+      expect(failedRes.body).toEqual({
+        error: "Invalid or expired reset token",
+      });
+    });
+  });
+
+  describe("Suspended Account Behavior", () => {
+    it("should reject password reset confirmation if user was suspended with HTTP 403", async () => {
+      const email = generateConfirmEmail("suspended_confirm");
+      const initialPassword = "InitialPassword123!";
+
+      const regRes = await request(app).post("/api/v1/auth/register").send({
+        name: "Suspended Confirm User",
+        email,
+        password: initialPassword,
+      });
+      const userId = regRes.body.user.id;
+
+      const { rawToken } = await createTokenFixture(userId);
+
+      // Suspend user in database
+      await prisma.user.update({
+        where: { id: userId },
+        data: { status: "SUSPENDED" },
+      });
+
+      // Attempt to confirm password reset
+      const res = await request(app)
+        .post("/api/v1/auth/password-reset/confirm")
+        .send({
+          token: rawToken,
+          newPassword: "NewPassword123!",
+        });
+
+      expect(res.status).toBe(403);
+      expect(res.body).toEqual({
+        error: "Account is suspended. Please contact support.",
+      });
+
+      // Verify password was NOT updated
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      expect(await bcrypt.compare(initialPassword, user!.password_hash)).toBe(true);
+
+      // Verify login remains rejected with 403
+      const loginRes = await request(app).post("/api/v1/auth/login").send({
+        email,
+        password: initialPassword,
+      });
+      expect(loginRes.status).toBe(403);
+    });
+  });
+
+  describe("Validation Errors (400 Bad Request)", () => {
+    it("should return 400 when token is missing", async () => {
+      const res = await request(app)
+        .post("/api/v1/auth/password-reset/confirm")
+        .send({
+          newPassword: "ValidPassword123!",
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({ error: "Token is required" });
+    });
+
+    it("should return 400 when new password is missing", async () => {
+      const res = await request(app)
+        .post("/api/v1/auth/password-reset/confirm")
+        .send({
+          token: "any_token_string",
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({ error: "Password is required" });
+    });
+
+    it("should return 400 when password is shorter than 8 characters", async () => {
+      const res = await request(app)
+        .post("/api/v1/auth/password-reset/confirm")
+        .send({
+          token: "any_token_string",
+          newPassword: "short",
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({
+        error: "Password must be at least 8 characters",
+      });
+    });
+
+    it("should return 400 when request body is empty", async () => {
+      const res = await request(app)
+        .post("/api/v1/auth/password-reset/confirm")
+        .send({});
 
       expect(res.status).toBe(400);
       expect(res.body).toHaveProperty("error");
