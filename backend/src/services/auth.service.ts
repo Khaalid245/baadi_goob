@@ -107,6 +107,10 @@ export const loginUser = async (input: LoginInput): Promise<LoginResult> => {
     throw new AppError("Invalid email or password", 401);
   }
 
+  if (user.status === UserStatus.DELETED) {
+    throw new AppError("Account has been deleted", 401);
+  }
+
   const isPasswordValid = await bcrypt.compare(password, user.password_hash);
   if (!isPasswordValid) {
     throw new AppError("Invalid email or password", 401);
@@ -158,8 +162,11 @@ export const requestPasswordReset = async (
     return { message: PASSWORD_RESET_GENERIC_MESSAGE };
   }
 
-  // Anti-enumeration & security: Do not generate active tokens for suspended accounts
-  if (user.status === UserStatus.SUSPENDED) {
+  // Anti-enumeration & security: Do not generate active tokens for suspended or deleted accounts
+  if (
+    user.status === UserStatus.SUSPENDED ||
+    user.status === UserStatus.DELETED
+  ) {
     return { message: PASSWORD_RESET_GENERIC_MESSAGE };
   }
 
@@ -222,7 +229,10 @@ export const confirmPasswordReset = async (
     throw new AppError("Invalid or expired reset token", 400);
   }
 
-  if (tokenRecord.user.status === UserStatus.SUSPENDED) {
+  if (
+    tokenRecord.user.status === UserStatus.SUSPENDED ||
+    tokenRecord.user.status === UserStatus.DELETED
+  ) {
     throw new AppError("Account is suspended. Please contact support.", 403);
   }
 

@@ -15,6 +15,7 @@ import { opportunityRouter } from "./routes/opportunity.routes";
 import { applicationRouter } from "./routes/application.routes";
 import { adminRouter } from "./routes/admin.routes";
 import { dashboardRouter } from "./routes/dashboard.routes";
+import { userRouter } from "./routes/user.routes";
 
 export const app = express();
 
@@ -52,6 +53,9 @@ app.use("/api/v1/admin", adminRouter);
 
 // Dashboard routes
 app.use("/api/v1/dashboard", dashboardRouter);
+
+// User routes
+app.use("/api/v1/users", userRouter);
 
 // Swagger API Documentation
 const swaggerPath = path.resolve(__dirname, "../../docs/openapi.yaml");

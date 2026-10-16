@@ -902,7 +902,7 @@ paths:
           name: status
           schema:
             type: string
-            enum: [ACTIVE, SUSPENDED]
+            enum: [ACTIVE, SUSPENDED, DELETED]
           description: Filter users by status (case-insensitive)
         - in: query
           name: page
@@ -997,10 +997,29 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
   /users/me:
     delete:
-      summary: Delete my account
+      summary: Delete my account (FR-020)
+      description: Soft-deletes and anonymizes the authenticated user's account (FR-020). Derives user identity strictly from authenticated JWT context. Removes personal details and profile information, invalidates credentials and tokens, closes active business opportunities, while retaining application and competition registration records for reporting (minimum 12-month retention).
+      security:
+        - bearerAuth: []
       responses:
-        '204':
-          description: No content
+        '200':
+          description: Account deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteAccountResponse'
+        '400':
+          description: Account has already been deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required or invalid/expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /dashboard/summary:
     get:
       summary: Get role-based dashboard summary (FR-022)
@@ -1686,7 +1705,7 @@ components:
           enum: [STUDENT, BUSINESS, ADMIN]
         status:
           type: string
-          enum: [ACTIVE, SUSPENDED]
+          enum: [ACTIVE, SUSPENDED, DELETED]
         created_at:
           type: string
           format: date-time
@@ -1734,6 +1753,14 @@ components:
           type: string
         user:
           $ref: '#/components/schemas/AdminUser'
+    DeleteAccountResponse:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          example: Account deleted successfully
     PasswordResetRequest:
       type: object
       additionalProperties: false

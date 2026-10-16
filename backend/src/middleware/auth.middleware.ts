@@ -74,6 +74,10 @@ export const authenticate = async (
       return next(new AppError("User account no longer exists", 401));
     }
 
+    if (user.status === UserStatus.DELETED) {
+      return next(new AppError("Account has been deleted", 401));
+    }
+
     if (user.status === UserStatus.SUSPENDED) {
       return next(
         new AppError("Account is suspended. Please contact support.", 403)
