@@ -41,6 +41,11 @@ describe("Admin Business Verification Module (FR-012, FR-019)", () => {
   let businessPostingTestToken: string;
   let businessPostingTestUserId: string;
 
+  let userToSuspendId: string;
+  let userToSuspendEmail: string;
+  const userToSuspendPassword = "SuspendTestPass123!";
+  let userToSuspendToken: string;
+
   beforeAll(async () => {
     const password_hash = await bcrypt.hash("Password123!", 10);
 
@@ -211,6 +216,25 @@ describe("Admin Business Verification Module (FR-012, FR-019)", () => {
       email: postingBiz.email,
       role: Role.BUSINESS,
     });
+
+    // 9. User for suspension/reactivation tests
+    const userToSuspend = await prisma.user.create({
+      data: {
+        name: "User To Suspend",
+        email: `suspend_target_${runId}@test.local`.toLowerCase(),
+        password_hash: await bcrypt.hash(userToSuspendPassword, 10),
+        role: Role.STUDENT,
+        status: UserStatus.ACTIVE,
+      },
+    });
+    userToSuspendId = userToSuspend.id;
+    userToSuspendEmail = userToSuspend.email;
+    createdUserIds.add(userToSuspendId);
+    userToSuspendToken = generateToken({
+      id: userToSuspend.id,
+      email: userToSuspend.email,
+      role: Role.STUDENT,
+    });
   });
 
   afterAll(async () => {
@@ -328,6 +352,71 @@ describe("Admin Business Verification Module (FR-012, FR-019)", () => {
         .patch(`/api/v1/admin/businesses/${pendingBusiness1ProfileId}/verification`)
         .set("Authorization", `Bearer ${suspendedAdminToken}`)
         .send({ status: "VERIFIED" });
+      expect(res.status).toBe(403);
+      expect(res.body.error).toMatch(/account is suspended/i);
+    });
+
+    it("should reject unauthenticated GET /admin/users with 401", async () => {
+      const res = await request(app).get("/api/v1/admin/users");
+      expect(res.status).toBe(401);
+      expect(res.body.error).toMatch(/authentication token is required/i);
+    });
+
+    it("should reject STUDENT accessing GET /admin/users with 403", async () => {
+      const res = await request(app)
+        .get("/api/v1/admin/users")
+        .set("Authorization", `Bearer ${studentToken}`);
+      expect(res.status).toBe(403);
+      expect(res.body.error).toMatch(/access denied/i);
+    });
+
+    it("should reject BUSINESS accessing GET /admin/users with 403", async () => {
+      const res = await request(app)
+        .get("/api/v1/admin/users")
+        .set("Authorization", `Bearer ${pendingBusiness1Token}`);
+      expect(res.status).toBe(403);
+      expect(res.body.error).toMatch(/access denied/i);
+    });
+
+    it("should reject suspended ADMIN accessing GET /admin/users with 403", async () => {
+      const res = await request(app)
+        .get("/api/v1/admin/users")
+        .set("Authorization", `Bearer ${suspendedAdminToken}`);
+      expect(res.status).toBe(403);
+      expect(res.body.error).toMatch(/account is suspended/i);
+    });
+
+    it("should reject unauthenticated PATCH /admin/users/:id/status with 401", async () => {
+      const res = await request(app)
+        .patch(`/api/v1/admin/users/${userToSuspendId}/status`)
+        .send({ status: "SUSPENDED" });
+      expect(res.status).toBe(401);
+      expect(res.body.error).toMatch(/authentication token is required/i);
+    });
+
+    it("should reject STUDENT accessing PATCH /admin/users/:id/status with 403", async () => {
+      const res = await request(app)
+        .patch(`/api/v1/admin/users/${userToSuspendId}/status`)
+        .set("Authorization", `Bearer ${studentToken}`)
+        .send({ status: "SUSPENDED" });
+      expect(res.status).toBe(403);
+      expect(res.body.error).toMatch(/access denied/i);
+    });
+
+    it("should reject BUSINESS accessing PATCH /admin/users/:id/status with 403", async () => {
+      const res = await request(app)
+        .patch(`/api/v1/admin/users/${userToSuspendId}/status`)
+        .set("Authorization", `Bearer ${pendingBusiness1Token}`)
+        .send({ status: "SUSPENDED" });
+      expect(res.status).toBe(403);
+      expect(res.body.error).toMatch(/access denied/i);
+    });
+
+    it("should reject suspended ADMIN accessing PATCH /admin/users/:id/status with 403", async () => {
+      const res = await request(app)
+        .patch(`/api/v1/admin/users/${userToSuspendId}/status`)
+        .set("Authorization", `Bearer ${suspendedAdminToken}`)
+        .send({ status: "SUSPENDED" });
       expect(res.status).toBe(403);
       expect(res.body.error).toMatch(/account is suspended/i);
     });
@@ -738,6 +827,303 @@ describe("Admin Business Verification Module (FR-012, FR-019)", () => {
 
       expect(res.status).toBe(403);
       expect(res.body.error).toMatch(/business verification was rejected/i);
+    });
+  });
+
+  describe("GET /api/v1/admin/users - User Listing & Filtering (FR-021)", () => {
+    it("should list all users with pagination and metadata for active admin", async () => {
+      const res = await request(app)
+        .get("/api/v1/admin/users")
+        .set("Authorization", `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body.users)).toBe(true);
+      expect(res.body.users.length).toBeGreaterThan(0);
+      expect(res.body.pagination).toBeDefined();
+      expect(res.body.total).toBeDefined();
+      expect(res.body.page).toBe(1);
+      expect(res.body.limit).toBe(10);
+    });
+
+    it("should filter users by role (case-insensitive)", async () => {
+      const resStudent = await request(app)
+        .get("/api/v1/admin/users")
+        .query({ role: "student" })
+        .set("Authorization", `Bearer ${adminToken}`);
+
+      expect(resStudent.status).toBe(200);
+      resStudent.body.users.forEach((u: { role: string }) => {
+        expect(u.role).toBe("STUDENT");
+      });
+
+      const resBiz = await request(app)
+        .get("/api/v1/admin/users")
+        .query({ role: "BUSINESS" })
+        .set("Authorization", `Bearer ${adminToken}`);
+
+      expect(resBiz.status).toBe(200);
+      resBiz.body.users.forEach((u: { role: string }) => {
+        expect(u.role).toBe("BUSINESS");
+      });
+
+      const resAdmin = await request(app)
+        .get("/api/v1/admin/users")
+        .query({ role: "admin" })
+        .set("Authorization", `Bearer ${adminToken}`);
+
+      expect(resAdmin.status).toBe(200);
+      resAdmin.body.users.forEach((u: { role: string }) => {
+        expect(u.role).toBe("ADMIN");
+      });
+    });
+
+    it("should filter users by status (case-insensitive)", async () => {
+      const resActive = await request(app)
+        .get("/api/v1/admin/users")
+        .query({ status: "active" })
+        .set("Authorization", `Bearer ${adminToken}`);
+
+      expect(resActive.status).toBe(200);
+      resActive.body.users.forEach((u: { status: string }) => {
+        expect(u.status).toBe("ACTIVE");
+      });
+
+      const resSuspended = await request(app)
+        .get("/api/v1/admin/users")
+        .query({ status: "SUSPENDED" })
+        .set("Authorization", `Bearer ${adminToken}`);
+
+      expect(resSuspended.status).toBe(200);
+      resSuspended.body.users.forEach((u: { status: string }) => {
+        expect(u.status).toBe("SUSPENDED");
+      });
+      const ids = resSuspended.body.users.map((u: { id: string }) => u.id);
+      expect(ids).toContain(suspendedAdminUserId);
+    });
+
+    it("should filter users by combined role and status", async () => {
+      const res = await request(app)
+        .get("/api/v1/admin/users")
+        .query({ role: "ADMIN", status: "SUSPENDED" })
+        .set("Authorization", `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      res.body.users.forEach((u: { role: string; status: string }) => {
+        expect(u.role).toBe("ADMIN");
+        expect(u.status).toBe("SUSPENDED");
+      });
+      const ids = res.body.users.map((u: { id: string }) => u.id);
+      expect(ids).toContain(suspendedAdminUserId);
+    });
+
+    it("should reject invalid role filter with HTTP 400", async () => {
+      const res = await request(app)
+        .get("/api/v1/admin/users")
+        .query({ role: "INVALID_ROLE" })
+        .set("Authorization", `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/role must be one of/i);
+    });
+
+    it("should reject invalid status filter with HTTP 400", async () => {
+      const res = await request(app)
+        .get("/api/v1/admin/users")
+        .query({ status: "INVALID_STATUS" })
+        .set("Authorization", `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/status must be one of/i);
+    });
+
+    it("should support pagination on user listing", async () => {
+      const res = await request(app)
+        .get("/api/v1/admin/users")
+        .query({ page: 1, limit: 2 })
+        .set("Authorization", `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.users.length).toBeLessThanOrEqual(2);
+      expect(res.body.limit).toBe(2);
+      expect(res.body.page).toBe(1);
+    });
+
+    it("should never expose password hashes, tokens, or secrets in user listing", async () => {
+      const res = await request(app)
+        .get("/api/v1/admin/users")
+        .set("Authorization", `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      res.body.users.forEach(
+        (u: {
+          id: string;
+          name: string;
+          email: string;
+          role: string;
+          status: string;
+          created_at: string;
+          password_hash?: string;
+          token?: string;
+        }) => {
+          expect(u.id).toBeDefined();
+          expect(u.name).toBeDefined();
+          expect(u.email).toBeDefined();
+          expect(u.role).toBeDefined();
+          expect(u.status).toBeDefined();
+          expect(u.created_at).toBeDefined();
+          expect(u.password_hash).toBeUndefined();
+          expect(u.token).toBeUndefined();
+        }
+      );
+    });
+  });
+
+  describe("PATCH /api/v1/admin/users/:id/status - User Suspension & Reactivation (FR-021)", () => {
+    it("should successfully suspend an active user (FR-021)", async () => {
+      const res = await request(app)
+        .patch(`/api/v1/admin/users/${userToSuspendId}/status`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ status: "SUSPENDED" });
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toMatch(/updated successfully/i);
+      expect(res.body.user).toBeDefined();
+      expect(res.body.user.id).toBe(userToSuspendId);
+      expect(res.body.user.status).toBe("SUSPENDED");
+      expect(res.body.user.password_hash).toBeUndefined();
+
+      // Verify DB persistence
+      const userInDb = await prisma.user.findUnique({
+        where: { id: userToSuspendId },
+      });
+      expect(userInDb?.status).toBe(UserStatus.SUSPENDED);
+    });
+
+    it("should prevent a suspended user from logging in (HTTP 403)", async () => {
+      const res = await request(app).post("/api/v1/auth/login").send({
+        email: userToSuspendEmail,
+        password: userToSuspendPassword,
+      });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toMatch(/account is suspended/i);
+    });
+
+    it("should prevent a suspended user's existing token from accessing protected endpoints (HTTP 403)", async () => {
+      const res = await request(app)
+        .get("/api/v1/students/me/profile")
+        .set("Authorization", `Bearer ${userToSuspendToken}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toMatch(/account is suspended/i);
+    });
+
+    it("should successfully reactivate a suspended user (FR-021)", async () => {
+      const res = await request(app)
+        .patch(`/api/v1/admin/users/${userToSuspendId}/status`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ status: "ACTIVE" });
+
+      expect(res.status).toBe(200);
+      expect(res.body.user.status).toBe("ACTIVE");
+
+      // Verify DB persistence
+      const userInDb = await prisma.user.findUnique({
+        where: { id: userToSuspendId },
+      });
+      expect(userInDb?.status).toBe(UserStatus.ACTIVE);
+    });
+
+    it("should allow a reactivated user to log in again (HTTP 200)", async () => {
+      const res = await request(app).post("/api/v1/auth/login").send({
+        email: userToSuspendEmail,
+        password: userToSuspendPassword,
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.body.token).toBeDefined();
+      expect(res.body.user.status).toBe("ACTIVE");
+    });
+
+    it("should prevent an administrator from suspending their own account (HTTP 400)", async () => {
+      const res = await request(app)
+        .patch(`/api/v1/admin/users/${adminUserId}/status`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ status: "SUSPENDED" });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(
+        /administrators cannot suspend their own account/i
+      );
+    });
+
+    it("should reject redundant transition if user is already ACTIVE with HTTP 400", async () => {
+      const res = await request(app)
+        .patch(`/api/v1/admin/users/${userToSuspendId}/status`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ status: "ACTIVE" });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/already active/i);
+    });
+
+    it("should reject redundant transition if user is already SUSPENDED with HTTP 400", async () => {
+      const res = await request(app)
+        .patch(`/api/v1/admin/users/${suspendedAdminUserId}/status`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ status: "SUSPENDED" });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/already suspended/i);
+    });
+
+    it("should return HTTP 400 for invalid user UUID route parameter", async () => {
+      const res = await request(app)
+        .patch("/api/v1/admin/users/invalid-uuid/status")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ status: "SUSPENDED" });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/invalid user id/i);
+    });
+
+    it("should return HTTP 404 for non-existent user UUID", async () => {
+      const nonExistentUuid = "00000000-0000-4000-8000-000000000000";
+      const res = await request(app)
+        .patch(`/api/v1/admin/users/${nonExistentUuid}/status`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ status: "SUSPENDED" });
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toMatch(/user not found/i);
+    });
+
+    it("should return HTTP 400 for invalid status value in request body", async () => {
+      const res = await request(app)
+        .patch(`/api/v1/admin/users/${userToSuspendId}/status`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ status: "DELETED" });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/status must be one of/i);
+    });
+
+    it("should return HTTP 400 for empty body", async () => {
+      const res = await request(app)
+        .patch(`/api/v1/admin/users/${userToSuspendId}/status`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({});
+
+      expect(res.status).toBe(400);
+    });
+
+    it("should return HTTP 400 when unexpected fields are passed (strict validation)", async () => {
+      const res = await request(app)
+        .patch(`/api/v1/admin/users/${userToSuspendId}/status`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ status: "SUSPENDED", extra: true });
+
+      expect(res.status).toBe(400);
     });
   });
 });
