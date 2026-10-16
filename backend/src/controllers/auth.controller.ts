@@ -1,6 +1,16 @@
 import { Request, Response, NextFunction } from "express";
-import { registerSchema, loginSchema } from "../validations/auth.validation";
-import { registerUser, loginUser } from "../services/auth.service";
+import {
+  registerSchema,
+  loginSchema,
+  passwordResetRequestSchema,
+  passwordResetConfirmSchema,
+} from "../validations/auth.validation";
+import {
+  registerUser,
+  loginUser,
+  requestPasswordReset,
+  confirmPasswordReset,
+} from "../services/auth.service";
 import { AppError } from "../middleware/errorHandler";
 
 export const register = async (
@@ -71,6 +81,48 @@ export const getMe = (
         role: req.user.role,
       },
     });
+  } catch (error: unknown) {
+    next(error);
+  }
+};
+
+export const requestPasswordResetHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const parseResult = passwordResetRequestSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      const errorMessage =
+        parseResult.error.issues[0]?.message || "Invalid input";
+      res.status(400).json({ error: errorMessage });
+      return;
+    }
+
+    const result = await requestPasswordReset(parseResult.data);
+    res.status(200).json(result);
+  } catch (error: unknown) {
+    next(error);
+  }
+};
+
+export const confirmPasswordResetHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const parseResult = passwordResetConfirmSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      const errorMessage =
+        parseResult.error.issues[0]?.message || "Invalid input";
+      res.status(400).json({ error: errorMessage });
+      return;
+    }
+
+    const result = await confirmPasswordReset(parseResult.data);
+    res.status(200).json(result);
   } catch (error: unknown) {
     next(error);
   }

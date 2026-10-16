@@ -6,6 +6,10 @@ import {
   DEFAULT_LOGIN_RATE_LIMIT_MAX,
   DEFAULT_LOGIN_RATE_LIMIT_WINDOW_MS,
   LOGIN_RATE_LIMIT_MESSAGE,
+  createPasswordResetRateLimiter,
+  DEFAULT_PASSWORD_RESET_RATE_LIMIT_MAX,
+  DEFAULT_PASSWORD_RESET_RATE_LIMIT_WINDOW_MS,
+  PASSWORD_RESET_RATE_LIMIT_MESSAGE,
 } from "../src/middleware/rateLimiter";
 
 describe("Login Rate Limiter Middleware", () => {
@@ -99,6 +103,62 @@ describe("Login Rate Limiter Middleware", () => {
       const meRes = await request(app).get("/api/v1/auth/me");
       expect(meRes.status).toBe(401);
       expect(meRes.headers["ratelimit-limit"]).toBeUndefined();
+    });
+  });
+});
+
+describe("Password Reset Rate Limiter Middleware", () => {
+  describe("Configuration Defaults", () => {
+    it("should have correct production defaults (5 requests, 15 minutes)", () => {
+      expect(DEFAULT_PASSWORD_RESET_RATE_LIMIT_MAX).toBe(5);
+      expect(DEFAULT_PASSWORD_RESET_RATE_LIMIT_WINDOW_MS).toBe(15 * 60 * 1000);
+      expect(PASSWORD_RESET_RATE_LIMIT_MESSAGE).toEqual({
+        error: "Too many password reset attempts, please try again later.",
+      });
+    });
+  });
+
+  describe("Isolated Password Reset Limiter Behavior", () => {
+    let testApp: express.Express;
+    const testLimit = 2;
+
+    beforeEach(() => {
+      testApp = express();
+      testApp.use(express.json());
+
+      const isolatedLimiter = createPasswordResetRateLimiter({
+        limit: testLimit,
+        windowMs: 60 * 1000,
+      });
+
+      testApp.post(
+        "/test-password-reset",
+        isolatedLimiter,
+        (_req: Request, res: Response) => {
+          res.status(200).json({ message: "reset initiated" });
+        }
+      );
+    });
+
+    it("should process password reset requests within limit and reject with 429 when exceeded", async () => {
+      for (let i = 1; i <= testLimit; i++) {
+        const res = await request(testApp)
+          .post("/test-password-reset")
+          .send({ email: "user@example.com" });
+
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({ message: "reset initiated" });
+        expect(res.headers["ratelimit-remaining"]).toBe(String(testLimit - i));
+      }
+
+      const throttledRes = await request(testApp)
+        .post("/test-password-reset")
+        .send({ email: "user@example.com" });
+
+      expect(throttledRes.status).toBe(429);
+      expect(throttledRes.body).toEqual({
+        error: "Too many password reset attempts, please try again later.",
+      });
     });
   });
 });
