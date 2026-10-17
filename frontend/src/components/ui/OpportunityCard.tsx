@@ -58,13 +58,16 @@ export const OpportunityCard: React.FC<OpportunityCardProps> = ({
   const formattedDeadline = (() => {
     try {
       const d = new Date(opportunity.deadline);
-      return `Closes ${d.toLocaleDateString('en-GB', {
+      const isClosed = opportunity.status === 'CLOSED';
+      const prefix = isClosed ? 'Closed' : 'Closes';
+      return `${prefix} ${d.toLocaleDateString('en-GB', {
         day: '2-digit',
         month: 'short',
         year: 'numeric',
       })}`;
     } catch {
-      return `Closes ${opportunity.deadline}`;
+      const prefix = opportunity.status === 'CLOSED' ? 'Closed' : 'Closes';
+      return `${prefix} ${opportunity.deadline}`;
     }
   })();
 
