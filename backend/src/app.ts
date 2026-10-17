@@ -1,6 +1,6 @@
 import express, { Request, Response } from "express";
 import helmet from "helmet";
-import cors from "cors";
+import { corsMiddleware } from "./common/cors";
 import pinoHttp from "pino-http";
 import swaggerUi from "swagger-ui-express";
 import YAML from "yamljs";
@@ -21,7 +21,7 @@ export const app = express();
 
 // Security and utility middleware
 app.use(helmet());
-app.use(cors());
+app.use(corsMiddleware);
 app.use(express.json());
 app.use(
   pinoHttp({
