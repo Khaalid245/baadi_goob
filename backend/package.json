@@ -14,7 +14,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "prisma db seed",
-    "test:db:deploy": "dotenv run --override -q -f .env.test -- prisma migrate deploy"
+    "test:db:deploy": "dotenv run --override -q -f .env.test -- prisma migrate deploy",
+    "purge:retention": "tsx src/scripts/purgeRetention.ts"
   },
   "keywords": [],
   "author": "",
