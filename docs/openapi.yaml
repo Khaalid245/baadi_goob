@@ -29,6 +29,31 @@ paths:
       responses:
         '200':
           description: OK
+  /auth/me:
+    get:
+      summary: Get current authenticated user
+      description: Returns the safe identity fields for the currently authenticated user session.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Authenticated user identity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthMeResponse'
+        '401':
+          description: Unauthorized or token invalid/expired, or user deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Account suspended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /auth/password-reset:
     post:
       summary: Request password reset (FR-017)
@@ -1066,6 +1091,40 @@ components:
           type: string
       required:
         - error
+    SafeUser:
+      type: object
+      required:
+        - id
+        - name
+        - email
+        - role
+        - status
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [STUDENT, BUSINESS, ADMIN]
+        status:
+          type: string
+          enum: [ACTIVE, SUSPENDED, DELETED]
+        created_at:
+          type: string
+          format: date-time
+    AuthMeResponse:
+      type: object
+      required:
+        - user
+      properties:
+        user:
+          $ref: '#/components/schemas/SafeUser'
     StudentProfile:
       type: object
       properties:

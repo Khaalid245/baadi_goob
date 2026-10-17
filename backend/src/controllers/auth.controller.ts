@@ -8,6 +8,7 @@ import {
 import {
   registerUser,
   loginUser,
+  getCurrentUser,
   requestPasswordReset,
   confirmPasswordReset,
 } from "../services/auth.service";
@@ -64,22 +65,20 @@ export const login = async (
   }
 };
 
-export const getMe = (
+export const getMe = async (
   req: Request,
   res: Response,
   next: NextFunction
-): void => {
+): Promise<void> => {
   try {
     if (!req.user) {
       return next(new AppError("Authentication required", 401));
     }
 
+    const user = await getCurrentUser(req.user.id);
+
     res.status(200).json({
-      user: {
-        id: req.user.id,
-        email: req.user.email,
-        role: req.user.role,
-      },
+      user,
     });
   } catch (error: unknown) {
     next(error);
