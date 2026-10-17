@@ -1,1 +1,114 @@
 @import "tailwindcss";
+
+@theme {
+  --color-brand-primary: #1F5FBF;
+  --color-brand-hover: #164A99;
+  --color-brand-dark: #0F3166;
+  --color-brand-blue-tint: #E8F0FC;
+  --color-brand-amber: #F5A623;
+  --color-brand-amber-tint: #FEF3D7;
+
+  --color-neutral-bg: #F7F9FC;
+  --color-neutral-surface: #FFFFFF;
+  --color-neutral-border: #E2E6EE;
+  --color-neutral-text-primary: #1B2433;
+  --color-neutral-text-secondary: #5B6475;
+  --color-neutral-disabled: #A3ABBA;
+
+  --color-semantic-success: #1E8E5A;
+  --color-semantic-success-tint: #E3F6EC;
+  --color-semantic-warning: #B7791F;
+  --color-semantic-warning-tint: #FEF3D7;
+  --color-semantic-error: #C0392B;
+  --color-semantic-error-tint: #FDECEA;
+  --color-semantic-info: #1F5FBF;
+  --color-semantic-info-tint: #E8F0FC;
+
+  --color-type-internship: #0F8B8D;
+  --color-type-internship-tint: #E0F4F4;
+  --color-type-job: #1F5FBF;
+  --color-type-job-tint: #E8F0FC;
+  --color-type-competition: #8A5A00;
+  --color-type-competition-tint: #FEF3D7;
+
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+@layer base {
+  :root {
+    --brand-primary: #1F5FBF;
+    --brand-hover: #164A99;
+    --brand-dark: #0F3166;
+    --brand-blue-tint: #E8F0FC;
+    --brand-amber: #F5A623;
+    --brand-amber-tint: #FEF3D7;
+
+    --neutral-bg: #F7F9FC;
+    --neutral-surface: #FFFFFF;
+    --neutral-border: #E2E6EE;
+    --neutral-text-primary: #1B2433;
+    --neutral-text-secondary: #5B6475;
+    --neutral-disabled: #A3ABBA;
+
+    --semantic-success: #1E8E5A;
+    --semantic-success-tint: #E3F6EC;
+    --semantic-warning: #B7791F;
+    --semantic-warning-tint: #FEF3D7;
+    --semantic-error: #C0392B;
+    --semantic-error-tint: #FDECEA;
+    --semantic-info: #1F5FBF;
+    --semantic-info-tint: #E8F0FC;
+
+    --type-internship: #0F8B8D;
+    --type-internship-tint: #E0F4F4;
+    --type-job: #1F5FBF;
+    --type-job-tint: #E8F0FC;
+    --type-competition: #8A5A00;
+    --type-competition-tint: #FEF3D7;
+  }
+
+  html {
+    font-family: var(--font-sans, 'Inter', system-ui, -apple-system, sans-serif);
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: #F7F9FC;
+    color: #1B2433;
+    min-height: 100vh;
+  }
+
+  /* Verified Figma Typography Hierarchy */
+  h1 {
+    font-size: 36px;
+    line-height: 44px;
+    font-weight: 700;
+    color: #1B2433;
+    letter-spacing: -0.02em;
+  }
+
+  h2 {
+    font-size: 28px;
+    line-height: 36px;
+    font-weight: 600;
+    color: #1B2433;
+    letter-spacing: -0.015em;
+  }
+
+  h3 {
+    font-size: 20px;
+    line-height: 28px;
+    font-weight: 600;
+    color: #1B2433;
+    letter-spacing: -0.01em;
+  }
+
+  p {
+    font-size: 16px;
+    line-height: 24px;
+    font-weight: 400;
+    color: #5B6475;
+  }
+}

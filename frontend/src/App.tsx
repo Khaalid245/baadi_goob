@@ -1,73 +1,98 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import Layout from './components/Layout';
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import PublicLayout from './components/layout/PublicLayout';
+import WorkspaceLayout from './components/layout/WorkspaceLayout';
 import RouteGuard from './components/RouteGuard';
+import { Button } from './components/ui/Button';
 
-// Public Pages
-const Landing = () => <div>Landing Page</div>;
-const OpportunitiesList = () => <div>Opportunities List</div>;
-const OpportunityDetails = () => <div>Opportunity Details</div>;
-const CompetitionsList = () => <div>Competitions List</div>;
-const Login = () => <div>Login</div>;
-const Register = () => <div>Register</div>;
+// Sprint 1 Pages
+import Landing from './pages/public/Landing';
+import OpportunitiesExplorer from './pages/public/OpportunitiesExplorer';
+import OpportunityDetails from './pages/public/OpportunityDetails';
+import CompetitionsExplorer from './pages/public/CompetitionsExplorer';
+import Login from './pages/auth/Login';
+import Register from './pages/auth/Register';
+import ForgotPassword from './pages/auth/ForgotPassword';
 
-// Student Pages
-const StudentDashboard = () => <div>Student Dashboard</div>;
-const StudentProfile = () => <div>Student Profile</div>;
-const MyApplications = () => <div>My Applications</div>;
+// Sprint 2 Pages
+import StudentDashboard from './pages/student/StudentDashboard';
+import StudentProfileWizard from './pages/student/StudentProfileWizard';
+import MyApplications from './pages/student/MyApplications';
 
-// Business Pages
-const BusinessDashboard = () => <div>Business Dashboard</div>;
-const CompanyProfile = () => <div>Company Profile</div>;
-const PostOpportunity = () => <div>Post/Edit Opportunity</div>;
-const ApplicantsList = () => <div>Applicants List</div>;
+// Sprint 3 Pages
+import BusinessDashboard from './pages/business/BusinessDashboard';
+import CompanyProfile from './pages/business/CompanyProfile';
+import PostOpportunity from './pages/business/PostOpportunity';
+import ApplicantsReview from './pages/business/ApplicantsReview';
 
-// Admin Pages
-const AdminDashboard = () => <div>Admin Dashboard</div>;
-const VerifyBusinesses = () => <div>Verify Businesses</div>;
-const ManageListingsUsers = () => <div>Manage Listings and Users</div>;
+// Sprint 4 Pages
+import AdminDashboard from './pages/admin/AdminDashboard';
+import VerifyBusinesses from './pages/admin/VerifyBusinesses';
+import ManageListingsUsers from './pages/admin/ManageListingsUsers';
 
-// 404
-const NotFound = () => <div>404 Not Found - <a href="/">Go Home</a></div>;
+// 404 Not Found Page
+const NotFound = () => (
+  <div className="flex min-h-[60vh] flex-col items-center justify-center text-center px-4">
+    <h1 className="text-[72px] leading-none font-bold text-[#1F5FBF]">404</h1>
+    <h2 className="mt-4 text-[24px] font-semibold text-[#1B2433]">Page not found</h2>
+    <p className="mt-2 text-[15px] text-[#5B6475] max-w-sm">
+      The page you are looking for doesn't exist or has been moved.
+    </p>
+    <div className="mt-6">
+      <Link to="/">
+        <Button variant="primary">Return home</Button>
+      </Link>
+    </div>
+  </div>
+);
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          {/* Public Routes */}
-          <Route index element={<Landing />} />
-          <Route path="opportunities" element={<OpportunitiesList />} />
-          <Route path="opportunities/:id" element={<OpportunityDetails />} />
-          <Route path="competitions" element={<CompetitionsList />} />
-          <Route path="login" element={<Login />} />
-          <Route path="register" element={<Register />} />
-
-          {/* Student Routes */}
-          <Route element={<RouteGuard allowedRoles={['student']} />}>
-            <Route path="student/dashboard" element={<StudentDashboard />} />
-            <Route path="student/profile" element={<StudentProfile />} />
-            <Route path="student/applications" element={<MyApplications />} />
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Public Layout Routes */}
+          <Route element={<PublicLayout />}>
+            <Route index element={<Landing />} />
+            <Route path="opportunities" element={<OpportunitiesExplorer />} />
+            <Route path="opportunities/:id" element={<OpportunityDetails />} />
+            <Route path="competitions" element={<CompetitionsExplorer />} />
+            <Route path="login" element={<Login />} />
+            <Route path="register" element={<Register />} />
+            <Route path="forgot-password" element={<ForgotPassword />} />
+            <Route path="*" element={<NotFound />} />
           </Route>
 
-          {/* Business Routes */}
-          <Route element={<RouteGuard allowedRoles={['business']} />}>
-            <Route path="business/dashboard" element={<BusinessDashboard />} />
-            <Route path="business/profile" element={<CompanyProfile />} />
-            <Route path="business/opportunities/new" element={<PostOpportunity />} />
-            <Route path="business/opportunities/:id/edit" element={<PostOpportunity />} />
-            <Route path="business/opportunities/:id/applicants" element={<ApplicantsList />} />
+          {/* Authenticated Student Routes with Workspace Layout */}
+          <Route element={<RouteGuard allowedRoles={['student', 'STUDENT']} />}>
+            <Route element={<WorkspaceLayout />}>
+              <Route path="student/dashboard" element={<StudentDashboard />} />
+              <Route path="student/profile" element={<StudentProfileWizard />} />
+              <Route path="student/applications" element={<MyApplications />} />
+            </Route>
           </Route>
 
-          {/* Admin Routes */}
-          <Route element={<RouteGuard allowedRoles={['admin']} />}>
-            <Route path="admin/dashboard" element={<AdminDashboard />} />
-            <Route path="admin/businesses" element={<VerifyBusinesses />} />
-            <Route path="admin/manage" element={<ManageListingsUsers />} />
+          {/* Authenticated Business Routes with Workspace Layout */}
+          <Route element={<RouteGuard allowedRoles={['business', 'BUSINESS']} />}>
+            <Route element={<WorkspaceLayout />}>
+              <Route path="business/dashboard" element={<BusinessDashboard />} />
+              <Route path="business/profile" element={<CompanyProfile />} />
+              <Route path="business/opportunities/new" element={<PostOpportunity />} />
+              <Route path="business/opportunities/:id/edit" element={<PostOpportunity />} />
+              <Route path="business/opportunities/:id/applicants" element={<ApplicantsReview />} />
+            </Route>
           </Route>
 
-          <Route path="*" element={<NotFound />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+          {/* Authenticated Admin Routes with Workspace Layout */}
+          <Route element={<RouteGuard allowedRoles={['admin', 'ADMIN']} />}>
+            <Route element={<WorkspaceLayout />}>
+              <Route path="admin/dashboard" element={<AdminDashboard />} />
+              <Route path="admin/businesses" element={<VerifyBusinesses />} />
+              <Route path="admin/manage" element={<ManageListingsUsers />} />
+            </Route>
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
