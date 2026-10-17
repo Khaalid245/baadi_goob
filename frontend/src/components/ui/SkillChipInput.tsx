@@ -63,8 +63,8 @@ export const SkillChipInput: React.FC<SkillChipInputProps> = ({
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
       addSkill(inputValue);
-    } else if (e.key === 'Backspace' && !inputValue && value.length > 0) {
-      removeSkill(value[value.length - 1]);
+    } else if (e.key === 'Backspace' && !inputValue && currentSkills.length > 0) {
+      removeSkill(currentSkills[currentSkills.length - 1]);
     }
   };
 
