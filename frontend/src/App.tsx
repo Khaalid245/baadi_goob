@@ -13,6 +13,7 @@ import CompetitionsExplorer from './pages/public/CompetitionsExplorer';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import ForgotPassword from './pages/auth/ForgotPassword';
+import PasswordResetConfirmation from './pages/auth/PasswordResetConfirmation';
 
 // Sprint 2 Pages
 import StudentDashboard from './pages/student/StudentDashboard';
@@ -60,6 +61,8 @@ export default function App() {
             <Route path="login" element={<Login />} />
             <Route path="register" element={<Register />} />
             <Route path="forgot-password" element={<ForgotPassword />} />
+            <Route path="password-reset-confirmation" element={<PasswordResetConfirmation />} />
+            <Route path="reset-password-confirmation" element={<PasswordResetConfirmation />} />
             <Route path="*" element={<NotFound />} />
           </Route>
 

@@ -9,6 +9,7 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
   required?: boolean;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
+  rightElement?: React.ReactNode;
 }
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
@@ -21,6 +22,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       required,
       leftIcon,
       rightIcon,
+      rightElement,
       id,
       disabled,
       ...props
@@ -60,19 +62,23 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
               'disabled:bg-[#F7F9FC] disabled:text-[#A3ABBA] disabled:border-[#E2E6EE] disabled:cursor-not-allowed',
               error && 'border-[#C0392B] focus:border-[#C0392B] focus:outline-[#C0392B]',
               leftIcon && 'pl-10',
-              rightIcon && 'pr-10',
+              (rightIcon || rightElement) && 'pr-10',
               className
             )}
             {...props}
           />
 
-          {rightIcon && !error && (
+          {rightElement ? (
+            <div className="absolute right-3 flex items-center z-10">
+              {rightElement}
+            </div>
+          ) : rightIcon && !error ? (
             <div className="absolute right-3.5 flex items-center pointer-events-none text-[#5B6475]">
               {rightIcon}
             </div>
-          )}
+          ) : null}
 
-          {error && (
+          {error && !rightElement && (
             <div className="absolute right-3.5 flex items-center pointer-events-none text-[#C0392B]">
               <AlertCircle className="h-4 w-4" />
             </div>
