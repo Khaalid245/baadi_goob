@@ -43,11 +43,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.setItem('furan_user', JSON.stringify(res.data.user));
       }
     } catch {
-      // If token expired/invalid, clear
-      localStorage.removeItem('furan_token');
-      localStorage.removeItem('furan_user');
-      setUser(null);
-      setToken(null);
+      // If token expired/invalid, clear (preserve in mock/offline dev mode)
+      if (!token.startsWith('mock_')) {
+        localStorage.removeItem('furan_token');
+        localStorage.removeItem('furan_user');
+        setUser(null);
+        setToken(null);
+      }
     } finally {
       setIsLoading(false);
     }

@@ -1,14 +1,21 @@
 import { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Menu, X, ArrowRight } from 'lucide-react';
+import { Menu, X, ArrowRight, Bell, Home, Compass, FileText, User } from 'lucide-react';
 import { Logo } from '../common/Logo';
 import { Button } from '../ui/Button';
 import { useAuth } from '../../context/AuthContext';
+import { cn } from '../../lib/utils';
 
 export default function PublicLayout() {
   const location = useLocation();
   const { user, isAuthenticated } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const searchParams = new URLSearchParams(location.search);
+  const stateParam = searchParams.get('state');
+  const isStudentAuthenticated =
+    (isAuthenticated && user?.role === 'STUDENT') ||
+    (stateParam === 'apply' || stateParam === 'applied' || stateParam === 'incomplete');
 
   const isActive = (path: string) => {
     if (path === '/' && location.pathname === '/') return true;
@@ -33,69 +40,127 @@ export default function PublicLayout() {
           {/* Brand Logo */}
           <Logo />
 
-          {/* Desktop Nav Links */}
-          <nav className="hidden md:flex items-center gap-8 text-[15px] font-medium text-[#1B2433]">
-            <Link
-              to="/opportunities"
-              className={`transition-colors hover:text-[#1F5FBF] ${
-                isActive('/opportunities') ? 'text-[#1F5FBF] font-semibold' : 'text-[#1B2433]'
-              }`}
-            >
-              Find opportunities
-            </Link>
-
-            <Link
-              to="/competitions"
-              className={`transition-colors hover:text-[#1F5FBF] ${
-                isActive('/competitions') ? 'text-[#1F5FBF] font-semibold' : 'text-[#1B2433]'
-              }`}
-            >
-              Competitions
-            </Link>
-
-            <Link
-              to="/register"
-              className="text-[#1B2433] hover:text-[#1F5FBF] transition-colors"
-            >
-              For organizations
-            </Link>
-          </nav>
-
-          {/* Desktop Actions */}
-          <div className="hidden md:flex items-center gap-4">
-            {isAuthenticated ? (
-              <Link to={getDashboardPath()}>
-                <Button variant="primary" size="md">
-                  Dashboard
-                  <ArrowRight className="h-4 w-4 ml-1" />
-                </Button>
+          {/* Desktop Nav Links & Actions for Logged-in Student vs Public */}
+          {isStudentAuthenticated ? (
+            <div className="hidden md:flex items-center gap-6">
+              <Link
+                to="/student/dashboard"
+                className="text-[14px] font-medium text-[#1B2433] hover:text-[#1F5FBF] transition-colors"
+              >
+                Student workspace
               </Link>
-            ) : (
-              <>
+              <a
+                href="#help"
+                className="text-[14px] font-medium text-[#5B6475] hover:text-[#1F5FBF] transition-colors"
+              >
+                Help center
+              </a>
+              <button
+                type="button"
+                title="Notifications"
+                className="p-1.5 text-[#5B6475] hover:text-[#1B2433] rounded-[8px] hover:bg-[#F7F9FC] transition-colors"
+              >
+                <Bell className="h-5 w-5" />
+              </button>
+              <div className="flex items-center gap-2 pl-1">
+                <img
+                  src="/images/hodan-avatar.png"
+                  alt="Student avatar"
+                  className="h-8 w-8 rounded-full object-cover border border-[#E2E6EE]"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
+                  }}
+                />
+                <span className="text-[14px] font-medium text-[#1B2433]">
+                  Student
+                </span>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Desktop Nav Links */}
+              <nav className="hidden md:flex items-center gap-8 text-[15px] font-medium text-[#1B2433]">
                 <Link
-                  to="/login"
-                  className="text-[15px] font-medium text-[#1B2433] hover:text-[#1F5FBF] px-3 py-2 transition-colors"
+                  to="/opportunities"
+                  className={`transition-colors hover:text-[#1F5FBF] ${
+                    isActive('/opportunities') ? 'text-[#1F5FBF] font-semibold' : 'text-[#1B2433]'
+                  }`}
                 >
-                  Log in
+                  Find opportunities
                 </Link>
-                <Link to="/register">
-                  <Button variant="primary" size="md">
-                    Get started
-                  </Button>
-                </Link>
-              </>
-            )}
-          </div>
 
-          {/* Mobile Menu Toggle Button */}
+                <Link
+                  to="/competitions"
+                  className={`transition-colors hover:text-[#1F5FBF] ${
+                    isActive('/competitions') ? 'text-[#1F5FBF] font-semibold' : 'text-[#1B2433]'
+                  }`}
+                >
+                  Competitions
+                </Link>
+
+                <Link
+                  to="/register"
+                  className="text-[#1B2433] hover:text-[#1F5FBF] transition-colors"
+                >
+                  For organizations
+                </Link>
+              </nav>
+
+              {/* Desktop Actions */}
+              <div className="hidden md:flex items-center gap-4">
+                {isAuthenticated ? (
+                  <Link to={getDashboardPath()}>
+                    <Button variant="primary" size="md">
+                      Dashboard
+                      <ArrowRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </Link>
+                ) : (
+                  <>
+                    <Link
+                      to="/login"
+                      className="text-[15px] font-medium text-[#1B2433] hover:text-[#1F5FBF] px-3 py-2 transition-colors"
+                    >
+                      Log in
+                    </Link>
+                    <Link to="/register">
+                      <Button variant="primary" size="md">
+                        Get started
+                      </Button>
+                    </Link>
+                  </>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Mobile Right Actions */}
           <div className="flex md:hidden items-center gap-2">
-            {!isAuthenticated && (
+            {isStudentAuthenticated ? (
+              <>
+                <button
+                  type="button"
+                  title="Notifications"
+                  className="p-1.5 text-[#5B6475] hover:text-[#1B2433]"
+                >
+                  <Bell className="h-5 w-5" />
+                </button>
+                <img
+                  src="/images/hodan-avatar.png"
+                  alt="Student avatar"
+                  className="h-8 w-8 rounded-full object-cover border border-[#E2E6EE]"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
+                  }}
+                />
+              </>
+            ) : !isAuthenticated ? (
               <Link to="/register">
                 <Button variant="primary" size="sm">
                   Get started
                 </Button>
               </Link>
-            )}
+            ) : null}
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -159,7 +224,7 @@ export default function PublicLayout() {
       </header>
 
       {/* Page Content Body */}
-      <main className="flex-grow">
+      <main className={cn('flex-grow', isStudentAuthenticated && 'pb-16 md:pb-0')}>
         <Outlet />
       </main>
 
@@ -196,6 +261,37 @@ export default function PublicLayout() {
           </p>
         </div>
       </footer>
+      {/* Mobile Fixed 4-Item Bottom Navigation Bar for Logged-In Student */}
+      {isStudentAuthenticated && (
+        <nav
+          className="md:hidden fixed bottom-0 left-0 right-0 z-40 h-16 bg-white border-t border-[#E2E6EE] flex items-center justify-around px-2 shadow-sm"
+          aria-label="Mobile student navigation"
+        >
+          {[
+            { label: 'Home', path: '/student/dashboard', icon: <Home className="h-5 w-5" /> },
+            { label: 'Explore', path: '/opportunities', icon: <Compass className="h-5 w-5" /> },
+            { label: 'Applications', path: '/student/applications', icon: <FileText className="h-5 w-5" /> },
+            { label: 'Profile', path: '/student/profile', icon: <User className="h-5 w-5" /> },
+          ].map((item, idx) => {
+            const active = isActive(item.path);
+            return (
+              <Link
+                key={idx}
+                to={item.path}
+                className={cn(
+                  'flex flex-col items-center justify-center flex-1 h-full py-1 text-[11px] font-medium transition-colors',
+                  active ? 'text-[#1F5FBF] font-semibold' : 'text-[#5B6475] hover:text-[#1B2433]'
+                )}
+              >
+                <div className={cn('mb-0.5', active ? 'text-[#1F5FBF]' : 'text-[#5B6475]')}>
+                  {item.icon}
+                </div>
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+      )}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import axios from 'axios';
 
 export const api = axios.create({
   baseURL: '/api/v1',
+  timeout: 3000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -21,11 +22,14 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('furan_token');
-      localStorage.removeItem('furan_user');
-      // If unauthorized and not already on /login, redirect
-      if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-        window.location.href = '/login';
+      const isMockToken = localStorage.getItem('furan_token')?.startsWith('mock_');
+      if (!isMockToken) {
+        localStorage.removeItem('furan_token');
+        localStorage.removeItem('furan_user');
+        // If unauthorized and not already on /login, redirect
+        if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+          window.location.href = '/login';
+        }
       }
     }
     return Promise.reject(error);
