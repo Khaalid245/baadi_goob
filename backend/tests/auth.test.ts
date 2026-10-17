@@ -1,10 +1,10 @@
 import crypto from "crypto";
 import request from "supertest";
 import bcrypt from "bcryptjs";
-import { Prisma } from "@prisma/client";
+import { Prisma, Role, UserStatus } from "@prisma/client";
 import { app } from "../src/app";
 import { prisma } from "../src/lib/prisma";
-import { verifyToken } from "../src/common/jwt";
+import { verifyToken, generateToken } from "../src/common/jwt";
 import {
   hashResetToken,
   PASSWORD_RESET_GENERIC_MESSAGE,
@@ -1137,6 +1137,215 @@ describe("POST /api/v1/auth/password-reset/confirm", () => {
 
       expect(res.status).toBe(400);
       expect(res.body).toHaveProperty("error");
+    });
+  });
+});
+
+describe("GET /api/v1/auth/me", () => {
+  const meRunId = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const meEmails = new Set<string>();
+
+  const generateMeEmail = (prefix: string): string => {
+    const email = `${prefix}_${meRunId}_${Math.random().toString(36).slice(2, 6)}@test.local`.toLowerCase();
+    meEmails.add(email);
+    return email;
+  };
+
+  afterAll(async () => {
+    if (meEmails.size > 0) {
+      await prisma.user.deleteMany({
+        where: {
+          email: { in: Array.from(meEmails) },
+        },
+      });
+    }
+  });
+
+  it("should return complete safe identity profile for STUDENT (status 200)", async () => {
+    const email = generateMeEmail("me_student");
+    const password = "ValidPassword123!";
+    const name = "Student Me User";
+
+    const regRes = await request(app).post("/api/v1/auth/register").send({
+      name,
+      email,
+      password,
+      role: "STUDENT",
+    });
+    expect(regRes.status).toBe(201);
+    const studentId = regRes.body.user.id;
+
+    const token = generateToken({
+      id: studentId,
+      email,
+      role: Role.STUDENT,
+    });
+
+    const res = await request(app)
+      .get("/api/v1/auth/me")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("user");
+    const { user } = res.body;
+
+    // Safe identity fields
+    expect(user.id).toBe(studentId);
+    expect(user.name).toBe(name);
+    expect(user.email).toBe(email);
+    expect(user.role).toBe("STUDENT");
+    expect(user.status).toBe("ACTIVE");
+    expect(typeof user.created_at).toBe("string");
+
+    // Verify no sensitive fields
+    expect(user.password).toBeUndefined();
+    expect(user.password_hash).toBeUndefined();
+    expect((res.body as Record<string, unknown>).password_hash).toBeUndefined();
+    expect((res.body as Record<string, unknown>).token).toBeUndefined();
+  });
+
+  it("should return complete safe identity profile for BUSINESS (status 200)", async () => {
+    const email = generateMeEmail("me_business");
+    const password = "ValidPassword123!";
+    const name = "Business Me User";
+
+    const regRes = await request(app).post("/api/v1/auth/register").send({
+      name,
+      email,
+      password,
+      role: "BUSINESS",
+    });
+    expect(regRes.status).toBe(201);
+    const bizId = regRes.body.user.id;
+
+    const token = generateToken({
+      id: bizId,
+      email,
+      role: Role.BUSINESS,
+    });
+
+    const res = await request(app)
+      .get("/api/v1/auth/me")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("user");
+    const { user } = res.body;
+
+    expect(user.id).toBe(bizId);
+    expect(user.name).toBe(name);
+    expect(user.email).toBe(email);
+    expect(user.role).toBe("BUSINESS");
+    expect(user.status).toBe("ACTIVE");
+    expect(typeof user.created_at).toBe("string");
+
+    // Verify no sensitive fields
+    expect(user.password).toBeUndefined();
+    expect(user.password_hash).toBeUndefined();
+  });
+
+  it("should return complete safe identity profile for ADMIN (status 200)", async () => {
+    const email = generateMeEmail("me_admin");
+    const password_hash = await bcrypt.hash("AdminPassword123!", 10);
+    const name = "Admin Me User";
+
+    const adminUser = await prisma.user.create({
+      data: {
+        name,
+        email,
+        password_hash,
+        role: Role.ADMIN,
+        status: UserStatus.ACTIVE,
+      },
+    });
+
+    const token = generateToken({
+      id: adminUser.id,
+      email: adminUser.email,
+      role: Role.ADMIN,
+    });
+
+    const res = await request(app)
+      .get("/api/v1/auth/me")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("user");
+    const { user } = res.body;
+
+    expect(user.id).toBe(adminUser.id);
+    expect(user.name).toBe(name);
+    expect(user.email).toBe(email);
+    expect(user.role).toBe("ADMIN");
+    expect(user.status).toBe("ACTIVE");
+    expect(typeof user.created_at).toBe("string");
+
+    // Verify no sensitive fields
+    expect(user.password).toBeUndefined();
+    expect(user.password_hash).toBeUndefined();
+  });
+
+  it("should return 401 when Authorization header is missing", async () => {
+    const res = await request(app).get("/api/v1/auth/me");
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ error: "Authentication token is required" });
+  });
+
+  it("should reject deleted accounts with 401", async () => {
+    const email = generateMeEmail("me_deleted");
+    const password_hash = await bcrypt.hash("Password123!", 10);
+
+    const deletedUser = await prisma.user.create({
+      data: {
+        name: "Deleted User",
+        email,
+        password_hash,
+        role: Role.STUDENT,
+        status: UserStatus.DELETED,
+      },
+    });
+
+    const token = generateToken({
+      id: deletedUser.id,
+      email: deletedUser.email,
+      role: Role.STUDENT,
+    });
+
+    const res = await request(app)
+      .get("/api/v1/auth/me")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ error: "Account has been deleted" });
+  });
+
+  it("should reject suspended accounts with 403", async () => {
+    const email = generateMeEmail("me_suspended");
+    const password_hash = await bcrypt.hash("Password123!", 10);
+
+    const suspendedUser = await prisma.user.create({
+      data: {
+        name: "Suspended User",
+        email,
+        password_hash,
+        role: Role.STUDENT,
+        status: UserStatus.SUSPENDED,
+      },
+    });
+
+    const token = generateToken({
+      id: suspendedUser.id,
+      email: suspendedUser.email,
+      role: Role.STUDENT,
+    });
+
+    const res = await request(app)
+      .get("/api/v1/auth/me")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual({
+      error: "Account is suspended. Please contact support.",
     });
   });
 });

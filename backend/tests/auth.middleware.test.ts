@@ -59,18 +59,19 @@ describe("Authentication & Authorization Middleware", () => {
         .set("Authorization", `Bearer ${token}`);
 
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({
-        user: {
-          id: user.id,
-          email: user.email,
-          role: user.role,
-        },
-      });
+      expect(res.body).toHaveProperty("user");
+      const { user: resUser } = res.body;
+      expect(resUser.id).toBe(user.id);
+      expect(resUser.name).toBe(user.name);
+      expect(resUser.email).toBe(user.email);
+      expect(resUser.role).toBe(user.role);
+      expect(resUser.status).toBe(user.status);
+      expect(resUser).toHaveProperty("created_at");
+
       // Ensure no sensitive fields leaked
       expect((res.body as Record<string, unknown>).token).toBeUndefined();
-      expect(res.body.user.password).toBeUndefined();
-      expect(res.body.user.password_hash).toBeUndefined();
-      expect(res.body.user.status).toBeUndefined();
+      expect(resUser.password).toBeUndefined();
+      expect(resUser.password_hash).toBeUndefined();
     });
 
     it("should return 403 when a suspended user presents a valid token", async () => {

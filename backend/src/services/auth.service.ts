@@ -142,6 +142,47 @@ export const loginUser = async (input: LoginInput): Promise<LoginResult> => {
 };
 
 /**
+ * Retrieves the safe user identity profile for the currently authenticated user (FR-016).
+ * Returns the exact safe fields matching loginUser: id, name, email, role, status, created_at.
+ * Throws AppError(401) if the account no longer exists or is deleted.
+ * Throws AppError(403) if the account is suspended.
+ */
+export const getCurrentUser = async (userId: string): Promise<SafeUser> => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      status: true,
+      created_at: true,
+    },
+  });
+
+  if (!user) {
+    throw new AppError("User account no longer exists", 401);
+  }
+
+  if (user.status === UserStatus.DELETED) {
+    throw new AppError("Account has been deleted", 401);
+  }
+
+  if (user.status === UserStatus.SUSPENDED) {
+    throw new AppError("Account is suspended. Please contact support.", 403);
+  }
+
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    status: user.status,
+    created_at: user.created_at,
+  };
+};
+
+/**
  * Initiates a password reset request (FR-017).
  * - Validates email and returns identical generic response regardless of whether
  *   the user exists or is suspended (anti-enumeration).
