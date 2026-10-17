@@ -82,7 +82,7 @@ For every functional requirement, three separate statuses are recorded:
 
 | Specification Area | Total Evaluated | Implemented | Partially Implemented | Not Implemented |
 | :--- | :---: | :---: | :---: | :---: |
-| **Cross-Cutting Specifications** | 5 | 0 | 5 | 0 |
+| **Cross-Cutting Specifications** | 5 | 1 | 4 | 0 |
 
 *(Token Lifecycle, CORS Policy, OpenAPI Contract Parity, 12-Month Purge Worker, and Outbound Email Transport).*
 
@@ -145,7 +145,7 @@ These items represent cross-cutting architectural mandates defined in SRS Sectio
 | Specification Area | SRS Section Reference | Documented Requirement | Actual Repository Implementation | Compliance Status | Remediation Required |
 | :--- | :--- | :--- | :--- | :---: | :--- |
 | **Authentication & Tokens** | Section 2.8 & B3.1 | "JWT access and refresh tokens" | Stateless HMAC SHA-256 JWT access tokens with a **fixed 15-minute default expiration (`15m`)**; no refresh tokens or rotation. | **Partially Implemented** | Either introduce refresh tokens with database/Redis rotation, or formally update SRS to document short-lived access tokens. |
-| **CORS Security** | Section B3.2 | "CORS limited to the frontend domain" | [`backend/src/app.ts`](../backend/src/app.ts) calls `cors()` without options, allowing all origins (`*`). | **Partially Implemented** | Restrict CORS in `app.ts` to `process.env.FRONTEND_URL` with `{ credentials: true }`. |
+| **CORS Security** | Section B3.2 | "CORS limited to the frontend domain" | Centralized, environment-aware origin policy in [`backend/src/common/cors.ts`](../backend/src/common/cors.ts) and [`backend/src/app.ts`](../backend/src/app.ts) restricts browser access to `FRONTEND_URL`, normalizes trailing slashes, permits loopback origins in non-production, enforces least privilege by omitting ambient credentials for stateless Bearer tokens, handles preflight `OPTIONS`, and fails fast on missing production configuration. Regression tested in [`app.test.ts`](../backend/tests/app.test.ts). | **Implemented** | None. Centralized CORS middleware and CI/test environment configuration verified. |
 | **OpenAPI Contract Parity** | Section 2.8 & B4 | Shared OpenAPI specification matching backend endpoints | Discrepancies in [`docs/openapi.yaml`](openapi.yaml): split registration routes documented vs unified in code; `/auth/me` omitted; `/auth/logout` phantom. | **Partially Implemented** | Update `docs/openapi.yaml` to match Express routes: unify `/auth/register`, document `/auth/me`, remove `/auth/logout`. |
 | **12-Month Retention Purge** | Section 7.4 | Retain application data for 12 months; delete personal details; purge after 12 months | Account deletion (FR-020) soft-deletes and anonymizes records immediately. No scheduled background worker exists to purge records > 12 months old. | **Partially Implemented** | Implement automated recurring task (e.g. node-cron or worker container) to delete records where `deleted_at < NOW() - INTERVAL 12 MONTH`. |
 | **Outbound Email Delivery** | Section 2.5, 6.2, B3.1 | Email delivery for status changes and account verification via Nodemailer | In-database `Notification` records and `PasswordResetToken` hashes are created, but no SMTP or email transport is wired. | **Partially Implemented** | Implement email transport adapter using Nodemailer (configured with AWS SES, SendGrid, or SMTP). |
@@ -168,9 +168,9 @@ These items represent cross-cutting architectural mandates defined in SRS Sectio
 
 ### 7.2 Security & Contract Gaps
 
-1. **CORS Unrestricted Ingress**:
-   - *Current State*: `backend/src/app.ts` attaches `cors()` with default configuration (`Access-Control-Allow-Origin: *`).
-   - *Risk Level*: **Medium**. In production, malicious web origins can interact with the API if credentials or tokens are forwarded.
+1. **CORS Unrestricted Ingress (Remediated)**:
+   - *Current State*: Centralized environment-aware CORS middleware (`backend/src/common/cors.ts`) enforces origin restrictions against `FRONTEND_URL`, normalizes trailing slashes, enforces least privilege by omitting ambient credentials for stateless Bearer tokens, and guards against missing production configuration.
+   - *Risk Level*: **Resolved**.
 2. **OpenAPI Specification Drift**:
    - *Current State*: Contract discrepancies between `openapi.yaml` and Express routes (split registration paths, missing `/auth/me`, phantom `/auth/logout`).
    - *Risk Level*: **Low to Medium**. Causes frontend TypeScript SDK generators to create incorrect API clients.
@@ -201,8 +201,8 @@ graph TD
 ```
 
 ### Phase 1: Security & API Contract Hygiene (Immediate)
-1. **Harden CORS in `backend/src/app.ts`**:
-   - Update `app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }))`.
+1. **Harden CORS in `backend/src/app.ts` (Completed)**:
+   - Centralized environment-aware `FRONTEND_URL` origin restriction implemented via `backend/src/common/cors.ts` (with least-privilege credential handling) and verified with regression tests.
 2. **Synchronize `docs/openapi.yaml`**:
    - Unify `POST /auth/register` schema; remove split `/auth/register/student` and `/auth/register/business`.
    - Document `GET /auth/me`.

@@ -1,5 +1,6 @@
 import request from "supertest";
 import { app } from "../src/app";
+import { getAllowedOrigins } from "../src/common/cors";
 
 describe("Application Endpoints & Base Behavior", () => {
   describe("GET /api/v1/health", () => {
@@ -56,4 +57,126 @@ describe("Application Endpoints & Base Behavior", () => {
       expect(res.body).toEqual({ error: "Invalid JSON format" });
     });
   });
+
+  describe("CORS Ingress Restriction (SRS Section B3.2)", () => {
+    const originalFrontendUrl = process.env.FRONTEND_URL;
+    const originalNodeEnv = process.env.NODE_ENV;
+
+    beforeEach(() => {
+      process.env.FRONTEND_URL = "http://localhost:5173";
+      process.env.NODE_ENV = "test";
+    });
+
+    afterAll(() => {
+      process.env.FRONTEND_URL = originalFrontendUrl;
+      process.env.NODE_ENV = originalNodeEnv;
+    });
+
+    it("1. Allowed frontend origin should receive matching Access-Control-Allow-Origin without credentials", async () => {
+      const res = await request(app)
+        .get("/api/v1/health")
+        .set("Origin", "http://localhost:5173");
+
+      expect(res.status).toBe(200);
+      expect(res.headers["access-control-allow-origin"]).toBe("http://localhost:5173");
+      expect(res.headers["access-control-allow-credentials"]).toBeUndefined();
+    });
+
+    it("2. Disallowed origin should NOT receive Access-Control-Allow-Origin header", async () => {
+      const res = await request(app)
+        .get("/api/v1/health")
+        .set("Origin", "http://malicious-unauthorized-website.com");
+
+      expect(res.status).toBe(200);
+      expect(res.headers["access-control-allow-origin"]).toBeUndefined();
+    });
+
+    it("3. Allowed-origin preflight OPTIONS should return status 204 with full CORS headers without credentials", async () => {
+      const res = await request(app)
+        .options("/api/v1/auth/login")
+        .set("Origin", "http://localhost:5173")
+        .set("Access-Control-Request-Method", "POST")
+        .set("Access-Control-Request-Headers", "Content-Type,Authorization");
+
+      expect(res.status).toBe(204);
+      expect(res.headers["access-control-allow-origin"]).toBe("http://localhost:5173");
+      expect(res.headers["access-control-allow-methods"]).toMatch(/POST/);
+      expect(res.headers["access-control-allow-headers"]).toMatch(/Content-Type/i);
+      expect(res.headers["access-control-allow-headers"]).toMatch(/Authorization/i);
+      expect(res.headers["access-control-allow-credentials"]).toBeUndefined();
+    });
+
+    it("4. Disallowed-origin preflight OPTIONS should NOT grant CORS access", async () => {
+      const res = await request(app)
+        .options("/api/v1/auth/login")
+        .set("Origin", "http://malicious-unauthorized-website.com")
+        .set("Access-Control-Request-Method", "POST");
+
+      expect(res.headers["access-control-allow-origin"]).toBeUndefined();
+    });
+
+    it("5. Requests without an Origin header must succeed without CORS headers (health check & Swagger)", async () => {
+      const healthRes = await request(app).get("/api/v1/health");
+      expect(healthRes.status).toBe(200);
+      expect(healthRes.body).toEqual({ status: "ok" });
+      expect(healthRes.headers["access-control-allow-origin"]).toBeUndefined();
+
+      const docsRes = await request(app).get("/api/docs/");
+      expect(docsRes.status).toBe(200);
+      expect(docsRes.text).toContain("swagger-ui");
+      expect(docsRes.headers["access-control-allow-origin"]).toBeUndefined();
+    });
+
+    it("6. Trailing-slash normalization: FRONTEND_URL with trailing slash matches browser Origin without slash", async () => {
+      process.env.FRONTEND_URL = "http://localhost:5173/";
+
+      const res = await request(app)
+        .get("/api/v1/health")
+        .set("Origin", "http://localhost:5173");
+
+      expect(res.status).toBe(200);
+      expect(res.headers["access-control-allow-origin"]).toBe("http://localhost:5173");
+    });
+
+    it("7. Development loopback behavior: permits 127.0.0.1:5173 when localhost:5173 is configured in non-production", async () => {
+      process.env.NODE_ENV = "test";
+      process.env.FRONTEND_URL = "http://localhost:5173";
+
+      const res = await request(app)
+        .get("/api/v1/health")
+        .set("Origin", "http://127.0.0.1:5173");
+
+      expect(res.status).toBe(200);
+      expect(res.headers["access-control-allow-origin"]).toBe("http://127.0.0.1:5173");
+    });
+
+    it("8. Fail-safe production behavior: throws in production if FRONTEND_URL is missing or malformed", () => {
+      process.env.NODE_ENV = "production";
+
+      // A. Missing in production
+      delete process.env.FRONTEND_URL;
+      expect(() => getAllowedOrigins()).toThrow(
+        "CRITICAL CONFIGURATION ERROR: FRONTEND_URL must be configured in production"
+      );
+
+      // B. Empty string in production
+      process.env.FRONTEND_URL = "   ";
+      expect(() => getAllowedOrigins()).toThrow(
+        "CRITICAL CONFIGURATION ERROR: FRONTEND_URL must be configured in production"
+      );
+
+      // C. Malformed URL in production
+      process.env.FRONTEND_URL = "not-a-valid-url";
+      expect(() => getAllowedOrigins()).toThrow(
+        "CRITICAL CONFIGURATION ERROR: Malformed FRONTEND_URL entry 'not-a-valid-url' in production"
+      );
+
+      // D. Valid production origin does NOT allow loopback
+      process.env.FRONTEND_URL = "https://baadigoob.com";
+      const prodOrigins = getAllowedOrigins();
+      expect(prodOrigins).toEqual(["https://baadigoob.com"]);
+      expect(prodOrigins).not.toContain("http://127.0.0.1:5173");
+    });
+  });
 });
+
